@@ -77,8 +77,8 @@ tauri-plugin-updater = { version = "2" }
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 
-[profile.dev.package."*"]
-opt-level = 1
+# [profile.dev.package."*"]
+# opt-level = 1
 
 [profile.release]
 panic = "abort"

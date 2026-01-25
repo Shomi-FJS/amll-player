@@ -7,12 +7,12 @@
 
 import * as lyrics from "@applemusic-like-lyrics/lyric";
 import {
-	type LyricLine as RawLyricLine,
 	parseLrc,
 	parseLys,
 	parseQrc,
 	parseTTML,
 	parseYrc,
+	type LyricLine as RawLyricLine,
 } from "@applemusic-like-lyrics/lyric";
 import GUI from "lil-gui";
 import Stats from "stats.js";
@@ -278,8 +278,8 @@ declare global {
 	interface Window {
 		globalLyricPlayer: DomLyricPlayer;
 		globalBackground:
-		| BackgroundRender<PixiRenderer>
-		| BackgroundRender<MeshGradientRenderer>;
+			| BackgroundRender<PixiRenderer>
+			| BackgroundRender<MeshGradientRenderer>;
 	}
 }
 

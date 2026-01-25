@@ -21,6 +21,7 @@ export abstract class LyricPlayerBase
 	implements HasElement, Disposable
 {
 	protected element: HTMLElement = document.createElement("div");
+	abstract get baseFontSize(): number;
 
 	protected currentTime = 0;
 	/** @internal */
@@ -56,6 +57,12 @@ export abstract class LyricPlayerBase
 	protected isPageVisible = true;
 
 	protected initialLayoutFinished = false;
+
+	/**
+	 * 标记用户是否正在进行滚动交互
+	 */
+	protected isUserScrolling = false;
+	protected wheelTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	/**
 	 * 视图额外预渲染（overscan）距离，单位：像素。
@@ -146,104 +153,164 @@ export abstract class LyricPlayerBase
 	protected wordFadeWidth = 0.5;
 	protected targetAlignIndex = 0;
 
-	constructor() {
+	constructor(element?: HTMLElement) {
 		super();
+		if (element) this.element = element;
+		this.element.classList.add("amll-lyric-player");
+
 		this.resizeObserver.observe(this.element);
 		this.resizeObserver.observe(this.interludeDots.getElement());
-		this.element.classList.add(styles.lyricPlayer);
 
 		this.element.appendChild(this.interludeDots.getElement());
 		this.element.appendChild(this.bottomLine.getElement());
 		this.interludeDots.setTransform(0, 200);
+
 		window.addEventListener("pageshow", this.onPageShow);
 		window.addEventListener("pagehide", this.onPageHide);
+
 		let startScrollY = 0;
-		let direction: "up" | "down" | "none" = "none";
+
 		let startTouchPosY = 0;
+		let startTouchStartX = 0;
+		let startTouchStartY = 0;
+
+		let lastMoveY = 0;
 		let startScrollTime = 0;
 		let scrollSpeed = 0;
-		let scrollId = Symbol("amll-scroll");
-		let lastMoveY = 0;
-		let lastDragTime = 0;
+		let curScrollId = 0;
+
 		this.element.addEventListener("touchstart", (evt) => {
 			if (this.beginScrollHandler()) {
+				this.isUserScrolling = true;
+
 				evt.preventDefault();
 				startScrollY = this.scrollOffset;
+
 				startTouchPosY = evt.touches[0].screenY;
 				lastMoveY = startTouchPosY;
+
+				startTouchStartX = evt.touches[0].screenX;
+				startTouchStartY = evt.touches[0].screenY;
+
 				startScrollTime = Date.now();
 				scrollSpeed = 0;
+
+				this.calcLayout(true, true);
 			}
 		});
+
 		this.element.addEventListener("touchmove", (evt) => {
 			if (this.beginScrollHandler()) {
 				evt.preventDefault();
-				const touchScreenY = evt.touches[0].screenY;
-				const delta = touchScreenY - startTouchPosY;
-				const lastDelta = touchScreenY - lastMoveY;
-				const targetDirection =
-					lastDelta > 0 ? "down" : lastDelta < 0 ? "up" : "none";
-				if (direction !== targetDirection) {
-					direction = targetDirection;
-					startScrollY = this.scrollOffset;
-					startTouchPosY = touchScreenY;
-					startScrollTime = Date.now();
-				} else {
-					this.scrollOffset = startScrollY - delta;
-				}
-				lastMoveY = touchScreenY;
-				lastDragTime = Date.now();
+				const currentY = evt.touches[0].screenY;
+
+				const deltaY = currentY - startTouchPosY;
+				this.scrollOffset = startScrollY - deltaY;
 				this.limitScrollOffset();
-				this.calcLayout(true);
+
+				const now = Date.now();
+				const dt = now - startScrollTime;
+				if (dt > 0) {
+					scrollSpeed = (currentY - lastMoveY) / dt;
+				}
+				lastMoveY = currentY;
+				startScrollTime = now;
+
+				this.calcLayout(true, true);
 			}
 		});
+
 		this.element.addEventListener("touchend", (evt) => {
 			if (this.beginScrollHandler()) {
 				evt.preventDefault();
+
+				const touch = evt.changedTouches[0];
+				const moveX = Math.abs(touch.screenX - startTouchStartX);
+				const moveY = Math.abs(touch.screenY - startTouchStartY);
+
+				if (moveX < 10 && moveY < 10) {
+					const target = document.elementFromPoint(
+						touch.clientX,
+						touch.clientY,
+					);
+					if (target && this.element.contains(target)) {
+						(target as HTMLElement).click();
+					}
+					this.isUserScrolling = false;
+					this.endScrollHandler();
+					return;
+				}
+
 				startTouchPosY = 0;
-				const curTime = Date.now();
-				if (curTime - lastDragTime > 100) return this.endScrollHandler();
-				const scrollDuration = curTime - startScrollTime;
-				scrollSpeed =
-					((this.scrollOffset - startScrollY) / scrollDuration) * 1000;
-				let lt = 0;
-				const curScrollId = Symbol("amll-scroll");
-				scrollId = curScrollId;
-				const onScrollFrame = (dt: number) => {
-					lt ||= dt;
-					if (scrollId === curScrollId && this.beginScrollHandler()) {
-						this.scrollOffset += (scrollSpeed * (dt - lt)) / 1000;
-						scrollSpeed *= 0.99;
+				const scrollId = ++curScrollId;
+
+				if (Math.abs(scrollSpeed) < 0.1) scrollSpeed = 0;
+
+				let lastFrameTime = performance.now();
+
+				const onScrollFrame = (time: number) => {
+					if (scrollId !== curScrollId) return;
+
+					const dt = time - lastFrameTime;
+					lastFrameTime = time;
+
+					if (dt <= 0 || dt > 100) {
+						requestAnimationFrame(onScrollFrame);
+						return;
+					}
+
+					if (Math.abs(scrollSpeed) > 0.05) {
+						this.scrollOffset -= scrollSpeed * dt;
+
 						this.limitScrollOffset();
-						this.calcLayout(true);
-						if (
-							Math.abs(scrollSpeed) > 1 &&
-							!this.scrollBoundary.includes(this.scrollOffset)
-						) {
-							requestAnimationFrame(onScrollFrame);
-						}
+
+						const frictionFactor = 0.95 ** (dt / 16);
+						scrollSpeed *= frictionFactor;
+
+						this.calcLayout(true, true);
+
+						requestAnimationFrame(onScrollFrame);
+					} else {
+						this.isUserScrolling = false;
 						this.endScrollHandler();
-						lt = dt;
 					}
 				};
+
 				requestAnimationFrame(onScrollFrame);
-				this.endScrollHandler();
+			} else {
+				this.isUserScrolling = false;
 			}
 		});
-		this.element.addEventListener("wheel", (evt) => {
-			if (this.beginScrollHandler()) {
-				if (evt.deltaMode === evt.DOM_DELTA_PIXEL) {
-					this.scrollOffset += evt.deltaY;
-					this.limitScrollOffset();
-					this.calcLayout(true);
-				} else {
-					this.scrollOffset += evt.deltaY * 50;
-					this.limitScrollOffset();
-					this.calcLayout(false);
+
+		this.element.addEventListener(
+			"wheel",
+			(evt) => {
+				if (this.beginScrollHandler()) {
+					evt.preventDefault();
+					// this.isUserScrolling = true;
+
+					if (evt.deltaMode === evt.DOM_DELTA_PIXEL) {
+						this.scrollOffset += evt.deltaY;
+						this.limitScrollOffset();
+						this.calcLayout(true, false);
+					} else {
+						this.scrollOffset += evt.deltaY * 50;
+						this.limitScrollOffset();
+						this.calcLayout(false, false);
+					}
+
+					// if (this.wheelTimeout) {
+					// 	clearTimeout(this.wheelTimeout);
+					// }
+
+					// this.wheelTimeout = setTimeout(() => {
+					// 	this.isUserScrolling = false;
+					// 	this.endScrollHandler();
+					// }, 150);
 				}
-				this.endScrollHandler();
-			}
-		});
+			},
+			{ passive: false },
+		);
 	}
 
 	private beginScrollHandler() {
@@ -421,60 +488,36 @@ export abstract class LyricPlayerBase
 	protected getCurrentInterlude():
 		| [number, number, number, boolean]
 		| undefined {
-		if (this.bufferedLines.size > 0) return undefined;
 		const currentTime = this.currentTime + 20;
-		const i = this.scrollToIndex;
-		if (i === 0) {
-			if (this.processedLines[0]?.startTime) {
-				if (this.processedLines[0].startTime > currentTime) {
-					return [
-						currentTime,
-						Math.max(currentTime, this.processedLines[0].startTime - 250),
-						-2,
-						this.processedLines[0].isDuet,
-					];
-				}
-				if (
-					this.processedLines[1].startTime > currentTime &&
-					this.processedLines[0].endTime < currentTime
-				) {
-					return [
-						Math.max(this.processedLines[0].endTime, currentTime),
-						this.processedLines[1].startTime,
-						0,
-						this.processedLines[1].isDuet,
-					];
-				}
+		const currentIndex = this.scrollToIndex;
+		const lines = this.processedLines;
+
+		const checkGap = (
+			k: number,
+		): [number, number, number, boolean] | undefined => {
+			if (k < -1 || k >= lines.length - 1) return undefined;
+
+			const prevLine = k === -1 ? null : lines[k];
+			const nextLine = lines[k + 1];
+
+			const gapStart = prevLine ? prevLine.endTime : 0;
+			const gapEnd = Math.max(gapStart, nextLine.startTime - 250);
+
+			if (gapEnd - gapStart < 4000) {
+				return undefined;
 			}
-		} else if (
-			this.processedLines[i]?.endTime &&
-			this.processedLines[i + 1]?.startTime
-		) {
-			if (
-				this.processedLines[i + 1].startTime > currentTime &&
-				this.processedLines[i].endTime < currentTime
-			) {
-				return [
-					Math.max(this.processedLines[i].endTime, currentTime),
-					this.processedLines[i + 1].startTime,
-					i,
-					this.processedLines[i + 1].isDuet,
-				];
+
+			if (gapEnd > currentTime && gapStart < currentTime) {
+				return [Math.max(gapStart, currentTime), gapEnd, k, nextLine.isDuet];
 			}
-			if (
-				this.processedLines[i + 2]?.startTime &&
-				this.processedLines[i + 2].startTime > currentTime &&
-				this.processedLines[i + 1].endTime < currentTime
-			) {
-				return [
-					Math.max(this.processedLines[i + 1].endTime, currentTime),
-					this.processedLines[i + 2].startTime,
-					i + 1,
-					this.processedLines[i + 2].isDuet,
-				];
-			}
-		}
-		return undefined;
+			return undefined;
+		};
+
+		return (
+			checkGap(currentIndex - 1) ||
+			checkGap(currentIndex) ||
+			checkGap(currentIndex + 1)
+		);
 	}
 	/**
 	 * 设置当前播放歌词，要注意传入后这个数组内的信息不得修改，否则会发生错误
@@ -505,7 +548,7 @@ export abstract class LyricPlayerBase
 		}
 
 		this.hasDuetLine = this.processedLines.some((line) => line.isDuet);
-		
+
 		// 将行开始时间提早最多一秒
 		for (let i = this.processedLines.length - 1; i >= 0; i--) {
 			const line = this.processedLines[i];
@@ -622,15 +665,28 @@ export abstract class LyricPlayerBase
 		}
 		this.currentLyricLineObjects.forEach((lineObj, id, arr) => {
 			const line = lineObj.getLine();
+
 			if (!line.isBG && line.startTime <= time && line.endTime > time) {
+				if (isSeek) {
+					lineObj.enable(time);
+				}
+
 				if (!this.hotLines.has(id)) {
 					this.hotLines.add(id);
 					addedIds.add(id);
-					if (isSeek) lineObj.enable();
+
+					if (!isSeek) {
+						lineObj.enable();
+					}
+
 					if (arr[id + 1]?.getLine()?.isBG) {
 						this.hotLines.add(id + 1);
 						addedIds.add(id + 1);
-						if (isSeek) arr[id + 1].enable();
+						if (isSeek) {
+							arr[id + 1].enable(time);
+						} else {
+							arr[id + 1].enable();
+						}
 					}
 				}
 			}
@@ -642,17 +698,23 @@ export abstract class LyricPlayerBase
 			}
 		}
 		if (isSeek) {
-			if (this.bufferedLines.size > 0) {
-				this.scrollToIndex = Math.min(...this.bufferedLines);
-			} else {
-				this.scrollToIndex = this.processedLines.findIndex(
-					(line) => line.startTime >= time,
-				);
-			}
 			this.bufferedLines.clear();
 			for (const v of this.hotLines) {
 				this.bufferedLines.add(v);
 			}
+
+			if (this.bufferedLines.size > 0) {
+				this.scrollToIndex = Math.min(...this.bufferedLines);
+			} else {
+				const foundIndex = this.processedLines.findIndex(
+					(line) => line.startTime >= time,
+				);
+
+				this.scrollToIndex =
+					foundIndex === -1 ? this.processedLines.length : foundIndex;
+			}
+
+			this.resetScroll();
 			this.calcLayout();
 		} else if (removedIds.size > 0 || addedIds.size > 0) {
 			if (removedIds.size === 0 && addedIds.size > 0) {
@@ -703,24 +765,28 @@ export abstract class LyricPlayerBase
 	 * 2. 加载了新的歌词时（不论前后歌词是否完全一样）
 	 * 3. 用户自行跳转了歌曲播放位置（不论距离远近）
 	 *
-	 * @param force 是否不经过动画直接修改布局定位
-	 * @param reflow 是否进行重新布局（重新计算每行歌词大小）
+	 * @param sync 是否同步执行，通常用于初始化或 Resize 时立即布局
+	 * @param force 是否绕过弹簧效果强制更新位置
 	 */
-	async calcLayout(sync = false) {
+	async calcLayout(sync = false, force = false) {
 		const interlude = this.getCurrentInterlude();
 		let curPos = -this.scrollOffset;
-		let targetAlignIndex = this.scrollToIndex;
-		let interludeDuration = 0;
+		const targetAlignIndex = this.scrollToIndex;
+		let isNextDuet = false;
 		if (interlude) {
-			interludeDuration = interlude[1] - interlude[0];
-			if (interludeDuration >= 4000) {
-				const nextLine = this.currentLyricLineObjects[interlude[2] + 1];
-				if (nextLine) {
-					targetAlignIndex = interlude[2] + 1;
-				}
-			}
+			isNextDuet = interlude[3];
 		} else {
 			this.interludeDots.setInterlude(undefined);
+		}
+
+		const fontSize = this.baseFontSize || 24;
+		const dotMargin = fontSize * 0.4;
+		const totalInterludeHeight = this.interludeDotsSize[1] + dotMargin * 2;
+
+		if (interlude) {
+			if (interlude[2] !== -1) {
+				curPos -= totalInterludeHeight;
+			}
 		}
 		// 避免一开始就让所有歌词行挤在一起
 		const LINE_HEIGHT_FALLBACK = this.size[1] / 5;
@@ -762,19 +828,28 @@ export abstract class LyricPlayerBase
 			const isActive =
 				hasBuffered || (i >= this.scrollToIndex && i < latestIndex);
 			const line = lineObj.getLine();
-			if (
-				!setDots &&
-				interludeDuration >= 4000 &&
-				((i === this.scrollToIndex && interlude?.[2] === -2) ||
-					i === this.scrollToIndex + 1)
-			) {
+
+			const shouldShowDots = interlude && i === interlude[2] + 1;
+
+			if (!setDots && shouldShowDots) {
 				setDots = true;
-				this.interludeDots.setTransform(0, curPos);
+
+				curPos += dotMargin;
+
+				let targetX = 0;
+				if (interlude && isNextDuet) {
+					targetX = this.size[0] - this.interludeDotsSize[0];
+				}
+
+				this.interludeDots.setTransform(targetX, curPos);
+
 				if (interlude) {
 					this.interludeDots.setInterlude([interlude[0], interlude[1]]);
 				}
 				curPos += this.interludeDotsSize[1];
+				curPos += dotMargin;
 			}
+
 			let targetOpacity: number;
 
 			if (this.hidePassedLines) {
@@ -798,6 +873,7 @@ export abstract class LyricPlayerBase
 			}
 
 			let blurLevel = 0;
+
 			if (this.enableBlur) {
 				if (isActive) {
 					blurLevel = 0;
@@ -825,12 +901,16 @@ export abstract class LyricPlayerBase
 				}
 			}
 
+			if (this.isUserScrolling) {
+				blurLevel = 0;
+			}
+
 			lineObj.setTransform(
 				curPos,
 				targetScale,
 				targetOpacity,
 				window.innerWidth <= 1024 ? blurLevel * 0.8 : blurLevel,
-				false,
+				force,
 				delay,
 			);
 			if (line.isBG && (isActive || !this.isPlaying)) {
@@ -846,7 +926,7 @@ export abstract class LyricPlayerBase
 		});
 		this.scrollBoundary[1] = curPos + this.scrollOffset - this.size[1] / 2;
 		// console.groupEnd();
-		this.bottomLine.setTransform(0, curPos, false, delay);
+		this.bottomLine.setTransform(0, curPos, force, delay);
 	}
 
 	/**
@@ -995,7 +1075,7 @@ export abstract class LyricLineBase extends EventTarget implements Disposable {
 		scale: new Spring(100),
 	};
 	abstract getLine(): LyricLine;
-	abstract enable(): void;
+	abstract enable(time?: number): void;
 	abstract disable(): void;
 	abstract resume(): void;
 	abstract pause(): void;
@@ -1014,7 +1094,7 @@ export abstract class LyricLineBase extends EventTarget implements Disposable {
 		this.blur = blur;
 		this.delay = delay;
 	}
-	
+
 	rebuildElement() {}
 
 	/**

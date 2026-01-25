@@ -1,6 +1,7 @@
 import bezier from "bezier-easing";
 import type { LyricLine, LyricWord } from "../../interfaces.ts";
 import styles from "../../styles/lyric-player.module.css";
+import { isCJK } from "../../utils/is-cjk.ts";
 import { chunkAndSplitLyricWords } from "../../utils/lyric-split-words.ts";
 import {
 	createMatrix4,
@@ -194,17 +195,21 @@ export class LyricLineEl extends LyricLineBase {
 		this.isEnabled = true;
 		this.element.classList.add(styles.active);
 		const main = this.element.children[0] as HTMLDivElement;
+
+		const relativeTime = Math.max(
+			0,
+			maskAnimationTime - this.lyricLine.startTime,
+		);
+
 		for (const word of this.splittedWords) {
 			for (const a of word.elementAnimations) {
-				a.currentTime = 0;
+				a.currentTime = relativeTime;
 				a.playbackRate = 1;
 				a.play();
 			}
+
 			for (const a of word.maskAnimations) {
-				a.currentTime = Math.min(
-					this.totalDuration,
-					Math.max(0, maskAnimationTime - this.lyricLine.startTime),
-				);
+				a.currentTime = Math.min(this.totalDuration, relativeTime);
 				a.playbackRate = 1;
 				a.play();
 			}
@@ -224,6 +229,10 @@ export class LyricLineEl extends LyricLineBase {
 					a.playbackRate = -1;
 					a.play();
 				}
+			}
+
+			for (const a of word.maskAnimations) {
+				a.pause();
 			}
 		}
 		main.classList.remove(styles.active);
@@ -278,9 +287,11 @@ export class LyricLineEl extends LyricLineBase {
 	getLine() {
 		return this.lyricLine;
 	}
+	// private _hide = true;
 	private _prevParentEl: HTMLElement;
 	private lastStyle = "";
 	show() {
+		// this._hide = false;
 		if (!this.element.parentElement) {
 			this._prevParentEl.appendChild(this.element);
 			this.lyricPlayer.resizeObserver.observe(this.element);
@@ -288,10 +299,12 @@ export class LyricLineEl extends LyricLineBase {
 		if (!this.built) {
 			this.rebuildElement();
 			this.built = true;
+			this.updateMaskImageSync();
 		}
 		this.rebuildStyle();
 	}
 	hide() {
+		// this._hide = true;
 		if (this.element.parentElement) {
 			this._prevParentEl.removeChild(this.element);
 			this.lyricPlayer.resizeObserver.unobserve(this.element);
@@ -312,7 +325,7 @@ export class LyricLineEl extends LyricLineBase {
 		if (!this.lyricPlayer.getEnableSpring() && this.isInSight) {
 			style += `transition-delay:${this.delay}ms;`;
 		}
-		style += `filter:blur(${Math.min(32, this.blur)}px);`;
+		style += `filter:blur(${Math.min(5, this.blur)}px);`;
 		if (style !== this.lastStyle) {
 			this.lastStyle = style;
 			this.element.setAttribute("style", style);
@@ -333,21 +346,12 @@ export class LyricLineEl extends LyricLineBase {
 
 		const chunkedWords = chunkAndSplitLyricWords(this.lyricLine.words);
 		main.innerHTML = "";
+
 		for (const chunk of chunkedWords) {
-			if (Array.isArray(chunk)) {
-				// 多个没有空格的单词组合在一起
-				if (chunk.length === 0) continue;
-				this.buildChunkGroup(chunk, main);
-			} else if (chunk.word.trim().length === 0) {
-				// 纯空格
-				main.appendChild(document.createTextNode(" "));
-			} else {
-				// 单个单词
-				this.buildSingleWord(chunk, main);
-			}
+			this.buildWord(chunk, main);
 		}
+
 		this.setSubLinesText(trans, roman);
-		this.updateMaskImageSync();
 	}
 
 	/** 设置翻译与音译行文本 */
@@ -356,9 +360,56 @@ export class LyricLineEl extends LyricLineBase {
 		roman.innerText = this.lyricLine.romanLyric;
 	}
 
-	/** 处理一组连写（无空格）单词，包含强调效果 */
-	private buildChunkGroup(chunk: LyricWord[], main: HTMLDivElement) {
-		// 聚合区间与文本作为合并词
+	private createWord(word: LyricWord, shouldEmphasize: boolean): RealWord {
+		const mainWordEl = document.createElement("span");
+		const subElements: HTMLSpanElement[] = [];
+
+		if (shouldEmphasize) {
+			mainWordEl.classList.add(styles.emphasize);
+			for (const char of word.word.trim()) {
+				const charEl = document.createElement("span");
+				charEl.innerText = char;
+				subElements.push(charEl);
+				mainWordEl.appendChild(charEl);
+			}
+		} else {
+			if (!word.romanWord || word.romanWord.trim().length === 0) {
+				mainWordEl.innerText = word.word.trim();
+			}
+		}
+
+		if (word.romanWord && word.romanWord.trim().length > 0) {
+			if (!shouldEmphasize) {
+				const wordEl = document.createElement("div");
+				wordEl.innerText = word.word.trim();
+				mainWordEl.appendChild(wordEl);
+			}
+
+			const romanWordEl = document.createElement("div");
+			romanWordEl.innerText = word.romanWord.trim();
+			romanWordEl.classList.add(styles.romanWord);
+			mainWordEl.appendChild(romanWordEl);
+		}
+
+		const realWord: RealWord = {
+			...word,
+			mainElement: mainWordEl,
+			subElements: subElements,
+			elementAnimations: [this.initFloatAnimation(word, mainWordEl)],
+			maskAnimations: [],
+			width: 0,
+			height: 0,
+			padding: 0,
+			shouldEmphasize: shouldEmphasize,
+		};
+
+		return realWord;
+	}
+
+	private buildWord(input: LyricWord | LyricWord[], main: HTMLDivElement) {
+		const chunk = Array.isArray(input) ? input : [input];
+		if (chunk.length === 0) return;
+
 		const merged = chunk.reduce(
 			(a, b) => {
 				a.endTime = Math.max(a.endTime, b.endTime);
@@ -375,69 +426,37 @@ export class LyricLineEl extends LyricLineBase {
 				obscene: false,
 			} as LyricWord,
 		);
-		const emp = chunk
-			.map((word) => LyricLineBase.shouldEmphasize(word))
-			.reduce((a, b) => a || b, LyricLineBase.shouldEmphasize(merged));
+
+		let emp = chunk.some((word) => LyricLineBase.shouldEmphasize(word));
+		if (!isCJK(merged.word)) {
+			emp = emp || LyricLineBase.shouldEmphasize(merged);
+		}
 
 		const wrapperWordEl = document.createElement("span");
 		wrapperWordEl.classList.add(styles.emphasizeWrapper);
 
 		const characterElements: HTMLElement[] = [];
+
 		for (const word of chunk) {
-			const mainWordEl = document.createElement("span");
-			if (emp) {
-				mainWordEl.classList.add(styles.emphasize);
-				const charEls: HTMLSpanElement[] = [];
-				for (const char of this.lyricPlayer.processObsceneWord(word).trim()) {
-					const charEl = document.createElement("span");
-					charEl.innerText = char;
-					charEls.push(charEl);
-					characterElements.push(charEl);
-					mainWordEl.appendChild(charEl);
-				}
-				const realWord: RealWord = {
-					...word,
-					mainElement: mainWordEl,
-					subElements: charEls,
-					elementAnimations: [this.initFloatAnimation(word, mainWordEl)],
-					maskAnimations: [],
-					width: 0,
-					height: 0,
-					padding: 0,
-					shouldEmphasize: emp,
-				};
-				this.splittedWords.push(realWord);
-			} else {
-				// 普通显示（可能含音译）
-				if (word.romanWord && word.romanWord.trim().length > 0) {
-					const wordEl = document.createElement("div");
-					const romanWordEl = document.createElement("div");
-					wordEl.innerText = this.lyricPlayer.processObsceneWord(word);
-					romanWordEl.innerText = word.romanWord;
-					romanWordEl.classList.add(styles.romanWord);
-					mainWordEl.appendChild(wordEl);
-					mainWordEl.appendChild(romanWordEl);
-				} else {
-					mainWordEl.innerText = this.lyricPlayer.processObsceneWord(word);
-				}
-				this.splittedWords.push({
-					...word,
-					mainElement: mainWordEl,
-					subElements: [],
-					elementAnimations: [this.initFloatAnimation(word, mainWordEl)],
-					maskAnimations: [],
-					width: 0,
-					height: 0,
-					padding: 0,
-					shouldEmphasize: emp,
-				});
+			if (!word.word.trim()) {
+				wrapperWordEl.appendChild(document.createTextNode(word.word));
+				continue;
 			}
-			wrapperWordEl.appendChild(mainWordEl);
+
+			const realWord = this.createWord(word, emp);
+
+			if (emp) {
+				characterElements.push(...realWord.subElements);
+			}
+
+			this.splittedWords.push(realWord);
+			wrapperWordEl.appendChild(realWord.mainElement);
 		}
 
-		// 组强调动画追加到该组的最后一个词的动画列表（保持原逻辑）
-		if (emp) {
-			this.splittedWords[this.splittedWords.length - 1].elementAnimations.push(
+		if (emp && this.splittedWords.length > 0) {
+			const lastWordOfChunk = this.splittedWords[this.splittedWords.length - 1];
+
+			lastWordOfChunk.elementAnimations.push(
 				...this.initEmphasizeAnimation(
 					merged,
 					characterElements,
@@ -447,84 +466,9 @@ export class LyricLineEl extends LyricLineBase {
 			);
 		}
 
-		// 前后空格处理（保持原有判断）
-		if (merged.word.trimStart() !== merged.word) {
-			main.appendChild(document.createTextNode(" "));
-		}
 		main.appendChild(wrapperWordEl);
-		if (
-			merged.word.trimEnd() !== merged.word &&
-			LyricLineBase.shouldEmphasize(merged)
-		) {
-			main.appendChild(document.createTextNode(" "));
-		}
 	}
 
-	/** 渲染单个词（含强调与音译处理） */
-	private buildSingleWord(chunk: LyricWord, main: HTMLDivElement) {
-		const emp = LyricLineBase.shouldEmphasize(chunk);
-		const mainWordEl = document.createElement("span");
-		const realWord: RealWord = {
-			...chunk,
-			mainElement: mainWordEl,
-			subElements: [],
-			elementAnimations: [this.initFloatAnimation(chunk, mainWordEl)],
-			maskAnimations: [],
-			width: 0,
-			height: 0,
-			padding: 0,
-			shouldEmphasize: emp,
-		};
-
-		if (emp) {
-			mainWordEl.classList.add(styles.emphasize);
-			const charEls: HTMLSpanElement[] = [];
-			for (const char of this.lyricPlayer.processObsceneWord(chunk).trim()) {
-				const charEl = document.createElement("span");
-				charEl.innerText = char;
-				charEls.push(charEl);
-				mainWordEl.appendChild(charEl);
-			}
-			if (chunk.romanWord && chunk.romanWord.trim().length > 0) {
-				const romanWordEl = document.createElement("div");
-				romanWordEl.innerText = chunk.romanWord;
-				romanWordEl.classList.add(styles.romanWord);
-				mainWordEl.appendChild(romanWordEl);
-			}
-			realWord.subElements = charEls;
-			const duration = Math.abs(realWord.endTime - realWord.startTime);
-			realWord.elementAnimations.push(
-				...this.initEmphasizeAnimation(
-					chunk,
-					charEls,
-					duration,
-					realWord.startTime - this.lyricLine.startTime,
-				),
-			);
-		} else {
-			if (chunk.romanWord && chunk.romanWord.trim().length > 0) {
-				const wordEl = document.createElement("div");
-				const romanWordEl = document.createElement("div");
-				wordEl.innerText = this.lyricPlayer.processObsceneWord(chunk);
-				romanWordEl.innerText = chunk.romanWord;
-				romanWordEl.classList.add(styles.romanWord);
-				mainWordEl.appendChild(wordEl);
-				mainWordEl.appendChild(romanWordEl);
-			} else {
-				mainWordEl.innerText = this.lyricPlayer.processObsceneWord(chunk).trim();
-			}
-		}
-
-		// 前后空格处理
-		if (chunk.word.trimStart() !== chunk.word) {
-			main.appendChild(document.createTextNode(" "));
-		}
-		main.appendChild(mainWordEl);
-		if (chunk.word.trimEnd() !== chunk.word) {
-			main.appendChild(document.createTextNode(" "));
-		}
-		this.splittedWords.push(realWord);
-	}
 	private initFloatAnimation(word: LyricWord, wordEl: HTMLSpanElement) {
 		const delay = word.startTime - this.lyricLine.startTime;
 		const duration = Math.max(1000, word.endTime - word.startTime);
@@ -851,6 +795,19 @@ export class LyricLineEl extends LyricLineBase {
 	getElement() {
 		return this.element;
 	}
+
+	private updateMaskAlpha(scale: number) {
+		const factor = Math.max(0.0, Math.min(1.0, (scale - 0.97) / 0.03));
+		this.element.style.setProperty(
+			"--bright-mask-alpha",
+			`${factor * 0.8 + 0.2}`,
+		);
+		this.element.style.setProperty(
+			"--dark-mask-alpha",
+			`${factor * 0.2 + 0.2}`,
+		);
+	}
+
 	override setTransform(
 		top: number = this.top,
 		scale: number = this.scale,
@@ -892,19 +849,22 @@ export class LyricLineEl extends LyricLineBase {
 			// 	requestAnimationFrame(() => {
 			// 		this.element.classList.remove(styles.tmpDisableTransition);
 			// 	});
+			const currentScale = this.lineTransforms.scale.getCurrentPosition();
+			this.updateMaskAlpha(currentScale / 100);
 		} else {
 			// this.lineWebAnimationTransforms.posX.stop();
 			// this.lineWebAnimationTransforms.posY.stop();
 			// this.lineWebAnimationTransforms.scale.stop();
 			this.lineTransforms.posY.setTargetPosition(top, delay);
 			this.lineTransforms.scale.setTargetPosition(scale);
-			if (this.blur !== Math.min(32, blur)) {
-				this.blur = Math.min(32, blur);
+			if (this.blur !== Math.min(5, blur)) {
+				this.blur = Math.min(5, blur);
 				const roundedBlur = blur.toFixed(3);
 				this.element.style.filter = `blur(${roundedBlur}px)`;
 			}
 		}
 	}
+
 	update(delta = 0) {
 		if (!this.lyricPlayer.getEnableSpring()) return;
 		this.lineTransforms.posY.update(delta);
@@ -914,34 +874,10 @@ export class LyricLineEl extends LyricLineBase {
 		} else {
 			this.hide();
 		}
+
 		if (this.lyricPlayer.getEnableSpring()) {
-			this.element.style.setProperty(
-				"--bright-mask-alpha",
-				`${
-					Math.max(
-						0.0,
-						Math.min(
-							1.0,
-							this.lineTransforms.scale.getCurrentPosition() / 100 - 0.97,
-						) / 0.03,
-					) *
-						0.8 +
-					0.2
-				}`,
-			);
-			this.element.style.setProperty(
-				"--dark-mask-alpha",
-				`${
-					Math.max(
-						0.0,
-						Math.min(
-							1.0,
-							this.lineTransforms.scale.getCurrentPosition() / 100 - 0.97,
-						) / 0.03,
-					) *
-						0.2 +
-					0.2
-				}`,
+			this.updateMaskAlpha(
+				this.lineTransforms.scale.getCurrentPosition() / 100,
 			);
 		} else {
 			const computedStyle = window.getComputedStyle(this.element);
@@ -949,15 +885,7 @@ export class LyricLineEl extends LyricLineBase {
 
 			// Extract the scale value from the transform property
 			const scale = getScaleFromTransform(transform);
-
-			this.element.style.setProperty(
-				"--bright-mask-alpha",
-				`${Math.max(0.0, Math.min(1.0, (scale - 0.97) / 0.03)) * 0.8 + 0.2}`,
-			);
-			this.element.style.setProperty(
-				"--dark-mask-alpha",
-				`${Math.max(0.0, Math.min(1.0, (scale - 0.97) / 0.03)) * 0.2 + 0.2}`,
-			);
+			this.updateMaskAlpha(scale);
 		}
 	}
 

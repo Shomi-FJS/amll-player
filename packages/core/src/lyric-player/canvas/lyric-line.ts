@@ -3,9 +3,9 @@ import { chunkAndSplitLyricWords } from "../../utils/lyric-split-words.ts";
 import { LyricLineBase } from "../base.ts";
 import type { CanvasLyricPlayer } from "./index.ts";
 import {
+	layoutLine,
 	type TextLayoutConfig,
 	type TextLayoutResult,
-	layoutLine,
 } from "./text-layout";
 
 export class CanvasLyricLine extends LyricLineBase {
