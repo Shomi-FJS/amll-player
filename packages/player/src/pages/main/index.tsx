@@ -10,11 +10,10 @@ import {
 	Text,
 } from "@radix-ui/themes";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { platform } from "@tauri-apps/plugin-os";
 import { useLiveQuery } from "dexie-react-hooks";
-import { useAtom, useAtomValue } from "jotai";
-import { type FC, useEffect, useRef, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useAtomValue } from "jotai";
+import { type FC, useRef } from "react";
+import { Trans } from "react-i18next";
 import { Link } from "react-router-dom";
 import { ExtensionInjectPoint } from "../../components/ExtensionInjectPoint/index.tsx";
 import { NewPlaylistButton } from "../../components/NewPlaylistButton/index.tsx";
@@ -22,24 +21,12 @@ import { PageContainer } from "../../components/PageContainer/index.tsx";
 import { PlaylistCard } from "../../components/PlaylistCard/index.tsx";
 import { db } from "../../dexie.ts";
 import { router } from "../../router.tsx";
-import {
-	updateInfoAtom,
-	musicContextModeAtom,
-	MusicContextMode,
-} from "../../states/appAtoms.ts";
+import { updateInfoAtom } from "../../states/appAtoms.ts";
 
 export const Component: FC = () => {
 	const playlists = useLiveQuery(() => db.playlists.toArray());
 	const updateInfo = useAtomValue(updateInfoAtom);
 	const parentRef = useRef<HTMLDivElement>(null);
-
-	const [musicContextMode, setMusicContextMode] = useAtom(musicContextModeAtom);
-	const [currentPlatform, setCurrentPlatform] = useState<string>("");
-	const { t } = useTranslation();
-
-	useEffect(() => {
-		setCurrentPlatform(platform());
-	}, []);
 
 	const rowVirtualizer = useVirtualizer({
 		count: playlists?.length ?? 0,
@@ -47,9 +34,6 @@ export const Component: FC = () => {
 		estimateSize: () => 105,
 		overscan: 5,
 	});
-
-	const isSystemListenerMode =
-		musicContextMode === MusicContextMode.SystemListener;
 
 	return (
 		<PageContainer>
@@ -73,17 +57,6 @@ export const Component: FC = () => {
 									</Trans>
 								</Badge>
 							)}
-							{isSystemListenerMode && (
-								<Badge
-									radius="full"
-									style={{ cursor: "pointer" }}
-									color="green"
-									ml="2"
-									onClick={() => router.navigate("/settings#player")}
-								>
-									{t("page.main.menu.systemListenerActive")}
-								</Badge>
-							)}
 						</Heading>
 					</Box>
 					<Flex gap="1" wrap="wrap">
@@ -102,24 +75,6 @@ export const Component: FC = () => {
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content>
 								<ExtensionInjectPoint injectPointName="page.main.menu.top" />
-
-								{currentPlatform === "windows" && (
-									<DropdownMenu.Item
-										color={isSystemListenerMode ? "green" : undefined}
-										onClick={() => {
-											setMusicContextMode(
-												isSystemListenerMode
-													? MusicContextMode.Local // 如果已是监听模式，则切换回本地模式
-													: MusicContextMode.SystemListener, // 否则，切换到监听模式
-											);
-										}}
-									>
-										{isSystemListenerMode
-											? t("page.main.menu.exitSystemListenerMode")
-											: t("page.main.menu.enterSystemListenerMode")}
-									</DropdownMenu.Item>
-								)}
-								{currentPlatform === "windows" && <DropdownMenu.Separator />}
 
 								<DropdownMenu.Sub>
 									<DropdownMenu.SubTrigger>

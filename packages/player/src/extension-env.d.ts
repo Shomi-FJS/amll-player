@@ -2,19 +2,16 @@ import type * as amllStates from "@applemusic-like-lyrics/react-full";
 import type { i18n } from "i18next";
 import type { Atom, createStore } from "jotai";
 import type { ComponentType } from "react";
-import type { db } from "./dexie.ts";
 import type * as appAtoms from "../../player/src/states/appAtoms";
-import type * as smtcAtoms from "../../player/src/states/smtcAtoms";
 import type * as extensionsAtoms from "../../player/src/states/extensionsAtoms";
+import type { db } from "./dexie.ts";
 
 export type * as RadixTheme from "@radix-ui/themes";
 export type * as Jotai from "jotai";
 export type * as React from "react";
 export type * as ReactDOM from "react-dom";
 
-type PlayerStatesModule = typeof appAtoms &
-	typeof smtcAtoms &
-	typeof extensionsAtoms;
+type PlayerStatesModule = typeof appAtoms & typeof extensionsAtoms;
 
 type AMLLStatesModule = typeof amllStates;
 

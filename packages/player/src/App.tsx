@@ -15,7 +15,6 @@ import { ExtensionInjectPoint } from "./components/ExtensionInjectPoint/index.ts
 import { LocalMusicContext } from "./components/LocalMusicContext/index.tsx";
 import { NowPlayingBar } from "./components/NowPlayingBar/index.tsx";
 import { ShotcutContext } from "./components/ShotcutContext/index.tsx";
-import { SystemListenerMusicContext } from "./components/SystemListenerMusicContext/index.tsx";
 import { UpdateContext } from "./components/UpdateContext/index.tsx";
 import { WSProtocolMusicContext } from "./components/WSProtocolMusicContext/index.tsx";
 import "./i18n";
@@ -26,10 +25,10 @@ import {
 	onClickAudioQualityTagAtom,
 } from "@applemusic-like-lyrics/react-full";
 import { invoke } from "@tauri-apps/api/core";
-import { StateConnector } from "./components/StateConnector/index.tsx";
 import { StatsComponent } from "./components/StatsComponent/index.tsx";
 import { router } from "./router.tsx";
 import {
+	audioQualityDialogOpenedAtom,
 	DarkMode,
 	darkModeAtom,
 	displayLanguageAtom,
@@ -38,7 +37,6 @@ import {
 	musicContextModeAtom,
 	showStatJSFrameAtom,
 } from "./states/appAtoms.ts";
-import { audioQualityDialogOpenedAtom } from "./states/smtcAtoms.ts";
 
 const ExtensionContext = lazy(() => import("./components/ExtensionContext"));
 const AMLLWrapper = lazy(() => import("./components/AMLLWrapper"));
@@ -148,16 +146,12 @@ function App() {
         `;
 	}, [lyricSize]);
 
-	// 渲染逻辑
 	return (
 		<>
 			{/* 上下文组件均不建议被 StrictMode 包含，以免重复加载扩展程序发生问题  */}
 			{showStatJSFrame && <StatsComponent />}
 			{musicContextMode === MusicContextMode.Local && (
 				<LocalMusicContext key={MusicContextMode.Local} />
-			)}
-			{musicContextMode === MusicContextMode.SystemListener && (
-				<SystemListenerMusicContext key={MusicContextMode.SystemListener} />
 			)}
 			{musicContextMode === MusicContextMode.WSProtocol && (
 				<WSProtocolMusicContext
@@ -173,9 +167,7 @@ function App() {
 				<ExtensionContext />
 			</Suspense>
 			<ExtensionInjectPoint injectPointName="context" hideErrorCallout />
-			<StateConnector />
 
-			{/* UI渲染 */}
 			<StrictMode>
 				<Theme
 					appearance={isDarkTheme ? "dark" : "light"}

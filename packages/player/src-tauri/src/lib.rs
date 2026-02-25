@@ -17,9 +17,6 @@ mod player;
 mod screen_capture;
 mod server;
 
-#[cfg(target_os = "windows")]
-mod external_media_controller;
-
 pub type AMLLWebSocketServerWrapper = RwLock<AMLLWebSocketServer>;
 pub type AMLLWebSocketServerState<'r> = State<'r, AMLLWebSocketServerWrapper>;
 
@@ -278,7 +275,7 @@ fn init_logging() {
     #[cfg(debug_assertions)]
     {
         tracing_subscriber::fmt()
-            .with_env_filter("amll_player=trace,smtc_suite=debug,wry=info")
+            .with_env_filter("amll_player=trace,wry=info")
             .with_thread_names(true)
             .with_timer(tracing_subscriber::fmt::time::uptime())
             .init();
@@ -344,22 +341,10 @@ pub fn run() {
             player::set_media_controls_enabled,
             read_local_music_metadata,
             restart_app,
-            #[cfg(target_os = "windows")]
-            external_media_controller::control_external_media,
-            #[cfg(target_os = "windows")]
-            external_media_controller::request_smtc_update,
             reset_window_theme,
         ])
         .setup(|app| {
             player::init_local_player(app.handle().clone());
-
-            #[cfg(target_os = "windows")]
-            {
-                info!("正在初始化外部媒体控制器...");
-                let controller_state =
-                    external_media_controller::start_listener(app.handle().clone());
-                app.manage(controller_state);
-            }
 
             #[cfg(desktop)]
             let _ = app

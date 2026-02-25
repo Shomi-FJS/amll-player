@@ -1,7 +1,6 @@
 import {
 	ArrowLeftIcon,
 	Component1Icon,
-	DesktopIcon,
 	GearIcon,
 	HamburgerMenuIcon,
 	InfoCircledIcon,
@@ -121,14 +120,6 @@ const SidebarContent: FC<{ onNavigate: (pageId: string) => void }> = ({
 				icon: <Component1Icon width={20} height={20} />,
 			},
 		];
-
-		if (os === "windows") {
-			pages.push({
-				id: "smtc",
-				label: t("page.settings.smtc.subtitle", "SMTC 监听设置"),
-				icon: <DesktopIcon width={20} height={20} />,
-			});
-		}
 
 		pages.push({
 			id: "about",

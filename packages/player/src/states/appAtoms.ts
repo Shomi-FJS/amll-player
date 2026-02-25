@@ -20,12 +20,10 @@ export enum DarkMode {
  * 定义了应用的音乐数据来源模式枚举。
  * - `local`: 本地文件播放模式。
  * - `ws-protocol`: WebSocket 协议模式。
- * - `system-listener`: SMTC 监听模式。
  */
 export enum MusicContextMode {
 	Local = "local",
 	WSProtocol = "ws-protocol",
-	SystemListener = "system-listener",
 }
 
 // ==================================================================
@@ -86,14 +84,6 @@ export const enableMediaControlsAtom = atom(
 			console.error("设置媒体控件的启用状态失败", err);
 		});
 	},
-);
-
-/**
- * 是否在 SMTC 监听模式下启用 WebSocket 接收歌词。
- */
-export const enableWsLyricsInSmtcModeAtom = atomWithStorage(
-	"amll-player.enableWsLyricsInSmtcMode",
-	true,
 );
 
 /**
@@ -179,3 +169,8 @@ export const updateInfoAtom = atom<Update | false>(false);
  * 控制是否启用自动检查更新。
  */
 export const autoUpdateAtom = atomWithStorage("amll-player.autoUpdate", true);
+
+/**
+ * 控制音质详情对话框是否打开。
+ */
+export const audioQualityDialogOpenedAtom = atom(false);
