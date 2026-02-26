@@ -70,6 +70,8 @@ export const isDarkThemeAtom = atom(
 		set(darkModeAtom, newIsDark ? DarkMode.Dark : DarkMode.Light),
 );
 
+export const hasBackgroundAtom = atom(false);
+
 export const playlistCardOpenedAtom = atom(false);
 
 export const recordPanelOpenedAtom = atom(false);

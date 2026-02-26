@@ -1,20 +1,11 @@
 import { Box, Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
-import { platform, version } from "@tauri-apps/plugin-os";
 import classNames from "classnames";
-import { atom, useAtomValue, useStore } from "jotai";
-import {
-	lazy,
-	StrictMode,
-	Suspense,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-} from "react";
+import { useAtomValue } from "jotai";
+import { lazy, StrictMode, Suspense, useEffect, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
-import semverGt from "semver/functions/gt";
 import styles from "./App.module.css";
 import { AppContainer } from "./components/AppContainer/index.tsx";
 import { ExtensionInjectPoint } from "./components/ExtensionInjectPoint/index.tsx";
@@ -29,27 +20,23 @@ import {
 	isLyricPageOpenedAtom,
 	LyricSizePreset,
 	lyricSizePresetAtom,
-	onClickAudioQualityTagAtom,
 } from "@applemusic-like-lyrics/react-full";
 import { StatsComponent } from "./components/StatsComponent/index.tsx";
 import { router } from "./router.tsx";
 import {
-	audioQualityDialogOpenedAtom,
 	displayLanguageAtom,
+	hasBackgroundAtom,
 	isDarkThemeAtom,
 	MusicContextMode,
 	musicContextModeAtom,
 	showStatJSFrameAtom,
 } from "./states/appAtoms.ts";
+import { useInitializeWindow } from "./utils/useInitializeWindow.ts";
 
 const ExtensionContext = lazy(() => import("./components/ExtensionContext"));
 const AMLLWrapper = lazy(() => import("./components/AMLLWrapper"));
 
-const hasBackgroundAtom = atom(false);
-
 function App() {
-	const store = useStore();
-	const isInitializedRef = useRef(false);
 	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
 	const showStatJSFrame = useAtomValue(showStatJSFrameAtom);
 	const musicContextMode = useAtomValue(musicContextModeAtom);
@@ -60,36 +47,11 @@ function App() {
 
 	const lyricSize = useAtomValue(lyricSizePresetAtom);
 
-	useEffect(() => {
-		const initializeWindow = async () => {
-			if (isInitializedRef.current) return;
-			isInitializedRef.current = true;
-
-			setTimeout(async () => {
-				const { getCurrentWindow } = await import("@tauri-apps/api/window");
-				const appWindow = getCurrentWindow();
-				if (platform() === "windows" && !semverGt(version(), "10.0.22000")) {
-					store.set(hasBackgroundAtom, true);
-					await appWindow.clearEffects();
-				}
-				await appWindow.show();
-			}, 50);
-		};
-		initializeWindow();
-	}, [store]);
+	useInitializeWindow();
 
 	useLayoutEffect(() => {
-		console.log("displayLanguage", displayLanguage, i18n);
 		i18n.changeLanguage(displayLanguage);
 	}, [i18n, displayLanguage]);
-
-	useEffect(() => {
-		store.set(onClickAudioQualityTagAtom, {
-			onEmit() {
-				store.set(audioQualityDialogOpenedAtom, true);
-			},
-		});
-	}, [store]);
 
 	useEffect(() => {
 		let fontSizeFormula = "";

@@ -32,6 +32,7 @@ import {
 	musicQualityTagAtom,
 	musicVolumeAtom,
 	onChangeVolumeAtom,
+	onClickAudioQualityTagAtom,
 	onClickControlThumbAtom,
 	onLyricLineClickAtom,
 	onPlayOrResumeAtom,
@@ -50,6 +51,7 @@ import { toast } from "react-toastify";
 import { db } from "../../dexie.ts";
 import {
 	advanceLyricDynamicLyricTimeAtom,
+	audioQualityDialogOpenedAtom,
 	enableMediaControlsAtom,
 } from "../../states/appAtoms.ts";
 import {
@@ -656,6 +658,13 @@ export const LocalMusicContext: FC = () => {
 		const toEmit = <T,>(onEmit: T) => ({ onEmit });
 
 		store.set(
+			onClickAudioQualityTagAtom,
+			toEmit(() => {
+				store.set(audioQualityDialogOpenedAtom, true);
+			}),
+		);
+
+		store.set(
 			onPlayOrResumeAtom,
 			toEmit(() => {
 				emitAudioThread("resumeOrPauseAudio");
@@ -767,6 +776,7 @@ export const LocalMusicContext: FC = () => {
 			unlistenPromise.then((unlisten) => unlisten());
 
 			const doNothing = toEmit(() => {});
+			store.set(onClickAudioQualityTagAtom, doNothing);
 			store.set(onRequestNextSongAtom, doNothing);
 			store.set(onRequestPrevSongAtom, doNothing);
 			store.set(onPlayOrResumeAtom, doNothing);
