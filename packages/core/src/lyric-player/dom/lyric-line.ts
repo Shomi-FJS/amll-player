@@ -426,7 +426,10 @@ export class LyricLineEl extends LyricLineBase {
 	}
 
 	private getRubyCharCount(word: LyricWord) {
-		return (word.ruby ?? []).reduce((total, ruby) => total + ruby.word.length, 0);
+		return (word.ruby ?? []).reduce(
+			(total, ruby) => total + ruby.word.length,
+			0,
+		);
 	}
 
 	private getRubySegments(word: LyricWord) {
