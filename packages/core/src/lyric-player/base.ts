@@ -9,7 +9,10 @@ import {
 import styles from "../styles/lyric-player.module.css";
 import { eqSet } from "../utils/eq-set.ts";
 import { isCJK } from "../utils/is-cjk.ts";
-import { optimizeLyricLines } from "../utils/optimize-lyric.ts";
+import {
+	type OptimizeLyricOptions,
+	optimizeLyricLines,
+} from "../utils/optimize-lyric.ts";
 import { Spring, type SpringParams } from "../utils/spring.ts";
 import { BottomLineEl } from "./bottom-line.ts";
 import { InterludeDots } from "./dom/interlude-dots.ts";
@@ -57,6 +60,7 @@ export abstract class LyricPlayerBase
 	readonly size: [number, number] = [0, 0];
 	protected allowScroll = true;
 	protected isPageVisible = true;
+	protected optimizeOptions: OptimizeLyricOptions = {};
 
 	protected initialLayoutFinished = false;
 
@@ -521,6 +525,18 @@ export abstract class LyricPlayerBase
 			checkGap(currentIndex + 1)
 		);
 	}
+
+	/**
+	 * 设置歌词的优化配置项，这些配置项默认全部开启
+	 *
+	 * 注意，如果在 `setLyricLines` 之后修改此配置，需要重新调用 `setLyricLines()` 才能对当前歌词生效
+	 * @param options 优化配置选项
+	 * @see {@link OptimizeLyricOptions}
+	 */
+	setOptimizeOptions(options: OptimizeLyricOptions) {
+		this.optimizeOptions = { ...this.optimizeOptions, ...options };
+	}
+
 	/**
 	 * 设置当前播放歌词，要注意传入后这个数组内的信息不得修改，否则会发生错误
 	 * @param lines 歌词数组
@@ -536,7 +552,7 @@ export abstract class LyricPlayerBase
 		this.currentTime = initialTime;
 		this.currentLyricLines = structuredClone(lines);
 		this.processedLines = structuredClone(this.currentLyricLines);
-		optimizeLyricLines(this.processedLines);
+		optimizeLyricLines(this.processedLines, this.optimizeOptions);
 
 		this.isNonDynamic = true;
 		for (const line of this.processedLines) {

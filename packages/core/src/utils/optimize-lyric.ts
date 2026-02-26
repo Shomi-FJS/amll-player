@@ -1,6 +1,72 @@
 import type { LyricLine } from "../interfaces.ts";
 
 /**
+ * 优化歌词行的配置选项
+ */
+export interface OptimizeLyricOptions {
+	/**
+	 * 规范化歌词中的空格
+	 *
+	 * 将多个连续空格替换为一个空格
+	 * @default true
+	 */
+	normalizeSpaces?: boolean;
+	/**
+	 * 是否将行级时间戳强行设为字级时间戳
+	 * @default true
+	 */
+	resetLineTimestamps?: boolean;
+	/**
+	 * 把多行背景人声转换为单行背景人声 + 主歌词行的形式
+	 * @default true
+	 */
+	convertExcessiveBackgroundLines?: boolean;
+	/**
+	 * 是否同步主歌词与背景人声的时间
+	 * @default true
+	 */
+	syncMainAndBackgroundLines?: boolean;
+	/**
+	 * 清洗非刻意的重叠，以免不必要的多行高亮效果
+	 *
+	 * 如果两行时间轴有重叠的歌词同时满足下列条件：
+	 * * 重叠小于 100ms
+	 * * 重叠时长不足下一行时长的 10%
+	 *
+	 * 则截断上一行歌词的结束时间为下一行歌词的开始时间
+	 * @default true
+	 */
+	cleanUnintentionalOverlaps?: boolean;
+	/**
+	 * 尝试让歌词提前最多 1 秒开始
+	 *
+	 * 有重叠则尝试最多提前 400ms 或上一行时长的 30%
+	 * @default true
+	 */
+	tryAdvanceStartTime?: boolean;
+}
+
+const DEFAULT_OPTIMIZE_OPTIONS: OptimizeLyricOptions = {
+	normalizeSpaces: true,
+	resetLineTimestamps: true,
+	convertExcessiveBackgroundLines: true,
+	syncMainAndBackgroundLines: true,
+	cleanUnintentionalOverlaps: true,
+	tryAdvanceStartTime: true,
+};
+
+/**
+ * 规范化歌词中的空格，将多个连续空格替换为一个空格
+ */
+function normalizeSpaces(lines: LyricLine[]) {
+	for (const line of lines) {
+		for (const word of line.words) {
+			word.word = word.word.replace(/\s+/g, " ");
+		}
+	}
+}
+
+/**
  * 将行级时间戳强行设为字级时间戳
  */
 function resetLineTimestamps(lines: LyricLine[]) {
@@ -176,17 +242,30 @@ function tryAdvanceStartTime(lines: LyricLine[]) {
  *
  * 注意会直接原地修改入参，确保你已经提前深克隆了歌词行数组
  * @param lines 歌词行数组
+ * @param options 优化的可选配置，默认全部开启
  */
-export function optimizeLyricLines(lines: LyricLine[]) {
-	for (const line of lines) {
-		for (const word of line.words) {
-			word.word = word.word.replace(/\s+/g, " ");
-		}
-	}
+export function optimizeLyricLines(
+	lines: LyricLine[],
+	options?: OptimizeLyricOptions,
+) {
+	const config = { ...DEFAULT_OPTIMIZE_OPTIONS, ...options };
 
-	resetLineTimestamps(lines);
-	convertExcessiveBackgroundLines(lines);
-	syncMainAndBackgroundLines(lines);
-	cleanUnintentionalOverlaps(lines);
-	tryAdvanceStartTime(lines);
+	if (config.normalizeSpaces) {
+		normalizeSpaces(lines);
+	}
+	if (config.resetLineTimestamps) {
+		resetLineTimestamps(lines);
+	}
+	if (config.convertExcessiveBackgroundLines) {
+		convertExcessiveBackgroundLines(lines);
+	}
+	if (config.syncMainAndBackgroundLines) {
+		syncMainAndBackgroundLines(lines);
+	}
+	if (config.cleanUnintentionalOverlaps) {
+		cleanUnintentionalOverlaps(lines);
+	}
+	if (config.tryAdvanceStartTime) {
+		tryAdvanceStartTime(lines);
+	}
 }
