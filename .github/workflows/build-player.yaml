@@ -78,7 +78,7 @@ jobs:
     runs-on: ${{ matrix.os_runner }}
     env:
       BUILDER_REPO: apoint123/ffmpeg-builder
-      FFMPEG_VERSION_TAG: "7.1"
+      FFMPEG_VERSION_TAG: "8.0.1"
 
     steps:
       - uses: actions/checkout@v4
@@ -299,7 +299,7 @@ jobs:
         shell: bash
         env:
           BUILDER_REPO: apoint123/ffmpeg-builder
-          FFMPEG_VERSION_TAG: "7.1"
+          FFMPEG_VERSION_TAG: "8.0.1"
         run: |
           declare -A targets
           targets["aarch64-linux-android"]="ffmpeg-${FFMPEG_VERSION_TAG}-android-arm64-v8a.tar.gz"
