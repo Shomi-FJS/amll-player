@@ -156,6 +156,7 @@ export abstract class LyricPlayerBase
 	}) as ResizeObserverCallback);
 	protected wordFadeWidth = 0.5;
 	protected targetAlignIndex = 0;
+	protected lastInterludeState = false;
 
 	constructor(element?: HTMLElement) {
 		super();
@@ -796,6 +797,44 @@ export abstract class LyricPlayerBase
 		this.lastCurrentTime = time;
 	}
 
+	protected updateDynamicSpringParams() {
+		if (!this.getEnableSpring() || this.processedLines.length === 0) return;
+
+		const currentIndex = this.scrollToIndex;
+		const currentLine = this.processedLines[currentIndex];
+		const prevLine = this.processedLines[currentIndex - 1];
+
+		if (currentLine && prevLine) {
+			const interval = currentLine.startTime - prevLine.endTime;
+
+			const MIN_INTERVAL = 100;
+			const MAX_INTERVAL = 800;
+			const clampedInterval = Math.max(
+				MIN_INTERVAL,
+				Math.min(MAX_INTERVAL, interval),
+			);
+
+			const MAX_STIFFNESS = 170;
+			const MIN_STIFFNESS = 130;
+
+			let ratio =
+				1 - (clampedInterval - MIN_INTERVAL) / (MAX_INTERVAL - MIN_INTERVAL);
+
+			ratio = ratio ** 0.2;
+
+			const targetStiffness =
+				MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
+
+			const dampingMultiplier = 2.2;
+			const targetDamping = Math.sqrt(targetStiffness) * dampingMultiplier;
+
+			this.setLinePosYSpringParams({
+				stiffness: targetStiffness,
+				damping: targetDamping,
+			});
+		}
+	}
+
 	/**
 	 * 重新布局定位歌词行的位置，调用完成后再逐帧调用 `update`
 	 * 函数即可让歌词通过动画移动到目标位置。
@@ -815,6 +854,23 @@ export abstract class LyricPlayerBase
 	 */
 	async calcLayout(sync = false, force = false) {
 		const interlude = this.getCurrentInterlude();
+		const isInterludeActive = !!interlude;
+
+		if (
+			this.targetAlignIndex !== this.scrollToIndex ||
+			this.lastInterludeState !== isInterludeActive
+		) {
+			this.lastInterludeState = isInterludeActive;
+
+			if (this.isSeeking) {
+				this.setLinePosYSpringParams({ stiffness: 90, damping: 15 });
+			} else if (isInterludeActive) {
+				this.setLinePosYSpringParams({ stiffness: 90, damping: 15 });
+			} else {
+				this.updateDynamicSpringParams();
+			}
+		}
+
 		let curPos = -this.scrollOffset;
 		const targetAlignIndex = this.scrollToIndex;
 		let isNextDuet = false;

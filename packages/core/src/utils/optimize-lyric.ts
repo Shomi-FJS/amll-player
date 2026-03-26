@@ -140,7 +140,7 @@ function cleanUnintentionalOverlaps(lines: LyricLine[]) {
 }
 
 /**
- * 尝试让歌词提前最多 1 秒开始，如果有重叠则尝试最多提前 400ms 或上一行时长的 30%
+ * 尝试让歌词提前最多 600ms 开始，如果有重叠则尝试最多提前 400ms 或上一行时长的 30%
  */
 function tryAdvanceStartTime(lines: LyricLine[]) {
 	for (let i = lines.length - 1; i >= 0; i--) {
@@ -165,7 +165,7 @@ function tryAdvanceStartTime(lines: LyricLine[]) {
 			const originallyHadGap = line.startTime >= prevLine.endTime;
 
 			if (originallyHadGap) {
-				targetAdvanceAmount = 1000;
+				targetAdvanceAmount = 600;
 				safeBoundary = prevLine.endTime;
 			} else {
 				targetAdvanceAmount = 400;
@@ -173,7 +173,7 @@ function tryAdvanceStartTime(lines: LyricLine[]) {
 				safeBoundary = prevLine.startTime + prevDuration * 0.3;
 			}
 		} else {
-			targetAdvanceAmount = 1000;
+			targetAdvanceAmount = 600;
 			safeBoundary = 0;
 		}
 
