@@ -5,7 +5,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
 		"lerna": "^9.0.7",
-		"nx": "^22.6.0",
+		"nx": "^22.6.4",
 		"typescript": "catalog:"
 	},
 	"scripts": {
