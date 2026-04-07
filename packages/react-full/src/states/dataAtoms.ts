@@ -142,3 +142,8 @@ export const fftDataAtom = atom<number[]>([]);
  * 取值范围建议在 [0.0-1.0] 之间
  */
 export const lowFreqVolumeAtom = atom<number>(1);
+
+/**
+ * 歌词贡献者信息
+ */
+export const lyricContributorAtom = atom<string | null>(null);

@@ -341,3 +341,33 @@ export const fftDataRangeAtom = atomWithStorage(
 	"amll-react-full.fftDataRange",
 	[80, 2000] as [number, number],
 );
+
+// ==================================================================
+//                        歌词贡献者配置
+// ==================================================================
+
+/**
+ * 是否显示歌词贡献者标签。
+ */
+export const showLyricContributorAtom = atomWithStorage(
+	"amll-react-full.showLyricContributor",
+	false,
+);
+
+/**
+ * 歌词贡献者查询源。
+ * - `mirror`: 使用镜像源查询。
+ * - `local`: 使用本地源查询（需手动下载缓存服务）。
+ */
+export enum ContributorSource {
+	Mirror = "mirror",
+	Local = "local",
+}
+
+/**
+ * 歌词贡献者查询源设置。
+ */
+export const contributorSourceAtom = atomWithStorage<ContributorSource>(
+	"amll-react-full.contributorSource",
+	ContributorSource.Mirror,
+);

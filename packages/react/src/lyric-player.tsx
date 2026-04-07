@@ -91,6 +91,16 @@ export interface LyricPlayerProps {
 	currentTime?: number;
 	isSeeking?: boolean;
 	/**
+	 * 设置歌曲总时长，单位为毫秒
+	 * 用于在歌词结束后延迟滚动到最后，避免过早显示空白区域
+	 */
+	songDuration?: number;
+	/**
+	 * 设置当前音频能量（0-1），用于在歌词结束时判断是否延迟滚动
+	 * 当音频能量较高时，表示歌曲还在播放，会延迟滚动到最后
+	 */
+	audioEnergy?: number;
+	/**
 	 * 设置文字动画的渐变宽度，单位以歌词行的主文字字体大小的倍数为单位，默认为 0.5，即一个全角字符的一半宽度
 	 *
 	 * 如果要模拟 Apple Music for Android 的效果，可以设置为 1
@@ -182,6 +192,8 @@ export const LyricPlayer = forwardRef<
 			lyricLines,
 			currentTime,
 			isSeeking,
+			songDuration,
+			audioEnergy,
 			wordFadeWidth,
 			linePosXSpringParams,
 			linePosYSpringParams,
@@ -288,6 +300,18 @@ export const LyricPlayer = forwardRef<
 		useEffect(() => {
 			corePlayer?.setIsSeeking(!!isSeeking);
 		}, [corePlayer, isSeeking]);
+
+		useEffect(() => {
+			if (songDuration !== undefined) {
+				corePlayer?.setSongDuration(songDuration);
+			}
+		}, [corePlayer, songDuration]);
+
+		useEffect(() => {
+			if (audioEnergy !== undefined) {
+				corePlayer?.setAudioEnergy(audioEnergy);
+			}
+		}, [corePlayer, audioEnergy]);
 
 		useEffect(() => {
 			corePlayer?.setWordFadeWidth(wordFadeWidth);

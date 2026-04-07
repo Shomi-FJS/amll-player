@@ -59,6 +59,8 @@ export abstract class LyricPlayerBase
 	protected allowScroll = true;
 	protected isPageVisible = true;
 	protected optimizeOptions: OptimizeLyricOptions = {};
+	protected songDuration = 0;
+	protected audioEnergy = 0;
 
 	protected initialLayoutFinished = false;
 
@@ -582,6 +584,22 @@ export abstract class LyricPlayerBase
 	}
 
 	/**
+	 * 设置歌曲总时长，用于在歌词结束后延迟滚动到最后
+	 * @param duration 歌曲总时长，单位为毫秒
+	 */
+	setSongDuration(duration: number) {
+		this.songDuration = duration;
+	}
+
+	/**
+	 * 设置当前音频能量（0-1），用于在歌词结束时判断是否延迟滚动
+	 * @param energy 音频能量值，0 表示静音，1 表示最大音量
+	 */
+	setAudioEnergy(energy: number) {
+		this.audioEnergy = Math.max(0, Math.min(1, energy));
+	}
+
+	/**
 	 * 设置当前播放歌词，要注意传入后这个数组内的信息不得修改，否则会发生错误
 	 * @param lines 歌词数组
 	 * @param initialTime 初始时间，默认为 0
@@ -787,9 +805,29 @@ export abstract class LyricPlayerBase
 					? this.processedLines.length
 					: this.processedLines.length - 1;
 
-				if (this.scrollToIndex !== targetIndex) {
-					this.scrollToIndex = targetIndex;
-					this.calcLayout();
+				const remainingTime = this.songDuration - time;
+				const DELAY_THRESHOLD = 4500;
+				const SCROLL_BEFORE_END = 3000;
+				const ENERGY_THRESHOLD = 0.05;
+
+				const hasAudioEnergy = this.audioEnergy > ENERGY_THRESHOLD;
+				const shouldDelayScroll =
+					(remainingTime > DELAY_THRESHOLD || hasAudioEnergy) &&
+					this.songDuration > 0;
+
+				if (shouldDelayScroll) {
+					const scrollTime = this.songDuration - SCROLL_BEFORE_END;
+					if (time >= scrollTime) {
+						if (this.scrollToIndex !== targetIndex) {
+							this.scrollToIndex = targetIndex;
+							this.calcLayout();
+						}
+					}
+				} else {
+					if (this.scrollToIndex !== targetIndex) {
+						this.scrollToIndex = targetIndex;
+						this.calcLayout();
+					}
 				}
 			}
 		}

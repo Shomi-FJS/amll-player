@@ -67,7 +67,7 @@ function pairLyric(line: LyricLine, lines: CoreLyricLine[], key: TransLine) {
 }
 
 interface LyricParserResult {
-	lyricLines: LyricLine[];
+	lyricLines: CoreLyricLine[];
 	hasLyrics: boolean;
 	metadata: [string, string[]][];
 }

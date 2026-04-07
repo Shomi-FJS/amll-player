@@ -37,8 +37,8 @@
 		}
 	},
 	"bottom_lyric": {
-		"lyricAuthor": "歌词作者：",
-		"songWriter": "创作者："
+		"lyricAuthor": "逐語クリエイター：",
+		"songWriter": "クリエイター："
 	},
 	"common": {
 		"dialog": {
@@ -266,14 +266,14 @@
 			},
 			"lyricContent": {
 				"bottomLyricMode": {
-					"description": "控制歌词底部显示的歌曲创作者及歌词作者信息",
-					"label": "底部信息",
+					"description": "歌詞下部に表示する曲のクリエイターと逐語クリエイター情報を制御",
+					"label": "下部情報",
 					"menu": {
-						"none": "完全不显示",
-						"onlyLyricAuthors": "只显示歌词作者",
-						"onlySongWriters": "只显示创作者",
-						"preferLyricAuthors": "优先显示歌词作者",
-						"preferSongWriters": "优先显示创作者"
+						"none": "表示しない",
+						"onlyLyricAuthors": "逐語クリエイターのみ",
+						"onlySongWriters": "クリエイターのみ",
+						"preferLyricAuthors": "逐語クリエイターを優先",
+						"preferSongWriters": "クリエイターを優先"
 					}
 				},
 				"enableLyricRomanLine": {

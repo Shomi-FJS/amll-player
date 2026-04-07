@@ -12,7 +12,7 @@ import {
 } from "@applemusic-like-lyrics/react";
 import structuredClone from "@ungap/structured-clone";
 import classNames from "classnames";
-import { AnimatePresence, LayoutGroup } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
 	type FC,
@@ -85,6 +85,7 @@ import {
 	PlayerControlsType,
 	playerControlsTypeAtom,
 	showBottomControlAtom,
+	showLyricContributorAtom,
 	showMusicAlbumAtom,
 	showMusicArtistsAtom,
 	showMusicNameAtom,
@@ -103,6 +104,7 @@ import {
 import {
 	fftDataAtom,
 	lowFreqVolumeAtom,
+	lyricContributorAtom,
 	musicAlbumNameAtom,
 	musicArtistsAtom,
 	musicCoverAtom,
@@ -247,6 +249,35 @@ const TotalDurationLabel: FC = () => {
 	return <>{time}</>;
 };
 
+const LyricContributorBadge: FC = React.memo(() => {
+	const lyricContributor = useAtomValue(lyricContributorAtom);
+	const showLyricContributor = useAtomValue(showLyricContributorAtom);
+
+	if (!showLyricContributor || !lyricContributor) {
+		return null;
+	}
+
+	return (
+		<motion.div
+			key="lyric-contributor"
+			initial={{ opacity: 0, scale: 0.8 }}
+			animate={{ opacity: 1, scale: 1 }}
+			exit={{ opacity: 0, scale: 0.8 }}
+			style={{
+				fontSize: "11px",
+				color: "rgba(255, 255, 255, 0.6)",
+				padding: "2px 6px",
+				background: "rgba(255, 255, 255, 0.08)",
+				borderRadius: "4px",
+				display: "flex",
+				alignItems: "center",
+			}}
+		>
+			逐词创作者：@{lyricContributor}
+		</motion.div>
+	);
+});
+
 const manualSeekTriggerAtom = atom<{ time: number; timestamp: number } | null>(
 	null,
 );
@@ -295,7 +326,17 @@ const PrebuiltProgressBar: FC = React.memo(() => {
 				<div style={fontStyle}>
 					<TimeLabel />
 				</div>
-				<div>
+				<div
+					style={{
+						display: "flex",
+						gap: "8px",
+						alignItems: "center",
+						whiteSpace: "nowrap",
+					}}
+				>
+					<AnimatePresence mode="popLayout">
+						<LyricContributorBadge />
+					</AnimatePresence>
 					<AnimatePresence mode="popLayout">
 						{musicQualityTag && (
 							<AudioQualityTag
@@ -348,6 +389,8 @@ const PrebuiltCoreLyricPlayer: FC<{
 	const lyricLines = useAtomValue(musicLyricLinesAtom);
 	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
 	const musicPlayingPosition = useAtomValue(musicPlayingPositionAtom);
+	const musicDuration = useAtomValue(musicDurationAtom);
+	const fftData = useAtomValue(fftDataAtom);
 
 	const lyricFontFamily = useAtomValue(lyricFontFamilyAtom);
 	const lyricFontWeight = useAtomValue(lyricFontWeightAtom);
@@ -407,6 +450,16 @@ const PrebuiltCoreLyricPlayer: FC<{
 		enableLyricSwapTransRomanLine,
 	]);
 
+	const audioEnergy = useMemo(() => {
+		if (!fftData || fftData.length === 0) return 0;
+		let sum = 0;
+		for (let i = 0; i < Math.min(fftData.length, 10); i++) {
+			sum += fftData[i];
+		}
+		const avg = sum / Math.min(fftData.length, 10);
+		return Math.min(avg / 100, 1);
+	}, [fftData]);
+
 	useEffect(() => {
 		if (manualSeekTrigger) {
 			amllPlayerRef.current?.lyricPlayer?.setCurrentTime(
@@ -434,6 +487,8 @@ const PrebuiltCoreLyricPlayer: FC<{
 			alignPosition={alignPosition}
 			alignAnchor={alignAnchor}
 			currentTime={musicPlayingPosition}
+			songDuration={musicDuration}
+			audioEnergy={audioEnergy}
 			lyricLines={processedLyricLines}
 			enableBlur={enableLyricLineBlurEffect}
 			enableScale={enableLyricLineScaleEffect}

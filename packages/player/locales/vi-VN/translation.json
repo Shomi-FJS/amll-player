@@ -37,8 +37,8 @@
 		}
 	},
 	"bottom_lyric": {
-		"lyricAuthor": "歌词作者：",
-		"songWriter": "创作者："
+		"lyricAuthor": "Người tạo lời từng từ：",
+		"songWriter": "Người sáng tác："
 	},
 	"common": {
 		"dialog": {
@@ -266,14 +266,14 @@
 			},
 			"lyricContent": {
 				"bottomLyricMode": {
-					"description": "控制歌词底部显示的歌曲创作者及歌词作者信息",
-					"label": "底部信息",
+					"description": "Điều khiển thông tin người sáng tác và người tạo lời từng từ hiển thị ở dưới cùng lời bài hát",
+					"label": "Thông tin dưới cùng",
 					"menu": {
-						"none": "完全不显示",
-						"onlyLyricAuthors": "只显示歌词作者",
-						"onlySongWriters": "只显示创作者",
-						"preferLyricAuthors": "优先显示歌词作者",
-						"preferSongWriters": "优先显示创作者"
+						"none": "Không hiển thị",
+						"onlyLyricAuthors": "Chỉ người tạo lời từng từ",
+						"onlySongWriters": "Chỉ người sáng tác",
+						"preferLyricAuthors": "Ưu tiên người tạo lời từng từ",
+						"preferSongWriters": "Ưu tiên người sáng tác"
 					}
 				},
 				"enableLyricRomanLine": {
