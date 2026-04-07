@@ -16,39 +16,46 @@ crate-type = ["staticlib", "cdylib", "lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.5.5", features = [] }
 
 [dependencies]
 anyhow = "1.0"
 anyhow-tauri = "1.0.0"
+axum = { version = "0.7", features = ["ws"] }
+base64 = "0.22.1"
 crossbeam-channel = "0.5.15"
 futures = "0.3.28"
 md5 = "0.7"
 urlencoding = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tokio = { version = "^1", features = [
     "rt-multi-thread",
     "macros",
     "process",
     "sync",
     "time",
+    "net",
 ] }
 tokio-tungstenite = "0.28"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
 
-tauri = { version = "2", features = ["devtools"] }
-tauri-plugin-dialog = { version = "2" }
-tauri-plugin-fs = { version = "2" }
-tauri-plugin-opener = { version = "2" }
-tauri-plugin-os = { version = "2" }
-tauri-plugin-shell = { version = "2" }
+tauri = { version = "2.10.1", features = ["devtools"] }
+tauri-plugin-dialog = { version = "2.6.0" }
+tauri-plugin-fs = { version = "2.4.5" }
+tauri-plugin-opener = { version = "2.5.3" }
+tauri-plugin-os = { version = "2.3.2" }
+tauri-plugin-shell = { version = "2.3.5" }
 
 amll-player-core = { path = "../../player-core" }
 ws-protocol = { path = "../../ws-protocol", features = ["tracing"] }
-tauri-plugin-http = "2"
+tauri-plugin-http = "2.5.7"
 rodio = "0.21"
+bitflags = "2.10"
+local-ip-address = "0.6.9"
 
 [dependencies.ffmpeg-next]
 version = "8"
@@ -81,8 +88,8 @@ windows = { version = "0.62", features = [
 cpal = { version = "^0.16", features = ["oboe-shared-stdcxx"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-global-shortcut = { version = "2" }
-tauri-plugin-updater = { version = "2" }
+tauri-plugin-global-shortcut = { version = "2.3.1" }
+tauri-plugin-updater = { version = "2.10.0" }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

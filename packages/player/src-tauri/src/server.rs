@@ -31,6 +31,8 @@ pub struct AMLLWebSocketServer {
     app: AppHandle,
     server_handle: Option<JoinHandle<()>>,
     connections: Connections,
+    channel: Option<Channel<v2::Payload>>,
+    listen_addr: Option<String>,
 }
 
 impl AMLLWebSocketServer {
@@ -39,6 +41,8 @@ impl AMLLWebSocketServer {
             app,
             server_handle: None,
             connections: Arc::new(TokioRwLock::new(HashMap::with_capacity(8))),
+            channel: None,
+            listen_addr: None,
         }
     }
 
@@ -53,19 +57,24 @@ impl AMLLWebSocketServer {
             }
         }
         conns.clear();
+        self.listen_addr = None;
         info!("WebSocket 服务器已关闭");
     }
 
-    pub fn reopen(&mut self, addr: String, channel: Channel<v2::Payload>) {
+    pub fn reopen(&mut self, addr: String, channel: Option<Channel<v2::Payload>>) {
         if let Some(task) = self.server_handle.take() {
             task.abort();
         }
         if addr.is_empty() {
+            self.listen_addr = None;
             info!("WebSocket 服务器已关闭");
             return;
         }
         let app = self.app.clone();
         let connections = self.connections.clone();
+        let channel_clone = channel.clone();
+        self.channel = channel_clone;
+        self.listen_addr = Some(addr.clone());
 
         self.server_handle = Some(tokio::spawn(async move {
             loop {
@@ -90,6 +99,15 @@ impl AMLLWebSocketServer {
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }));
+    }
+
+    pub fn set_listen_addr(&mut self, addr: String) {
+        let channel = self.channel.clone();
+        self.reopen(addr, channel);
+    }
+
+    pub fn get_listen_addr(&self) -> Option<&str> {
+        self.listen_addr.as_deref()
     }
 
     pub async fn get_connections(&self) -> Vec<SocketAddr> {
@@ -140,7 +158,7 @@ impl AMLLWebSocketServer {
         stream: TcpStream,
         app: AppHandle,
         conns: Connections,
-        channel: Channel<v2::Payload>,
+        channel: Option<Channel<v2::Payload>>,
     ) -> anyhow::Result<()> {
         let addr = stream.peer_addr()?;
         let addr_str = addr.to_string();
@@ -172,9 +190,11 @@ impl AMLLWebSocketServer {
                 }
                 Message::Binary(_) => {
                     info!("已识别为 BinaryV1 协议");
-                    if let Err(e) = Self::process_v1_message(first_message, &channel).await {
-                        error!("处理 V1 协议的消息时失败: {e:?}");
-                        return Ok(());
+                    if let Some(channel) = channel.as_ref() {
+                        if let Err(e) = Self::process_v1_message(first_message, channel).await {
+                            error!("处理 V1 协议的消息时失败: {e:?}");
+                            return Ok(());
+                        }
                     }
                     ProtocolType::BinaryV1
                 }
@@ -198,8 +218,20 @@ impl AMLLWebSocketServer {
             let conns_read = conns.read().await;
             if let Some(conn_info) = conns_read.get(&addr) {
                 let process_result = match conn_info.protocol {
-                    ProtocolType::BinaryV1 => Self::process_v1_message(message, &channel).await,
-                    ProtocolType::HybridV2 => Self::process_v2_message(message, &channel).await,
+                    ProtocolType::BinaryV1 => {
+                        if let Some(channel) = channel.as_ref() {
+                            Self::process_v1_message(message, channel).await
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    ProtocolType::HybridV2 => {
+                        if let Some(channel) = channel.as_ref() {
+                            Self::process_v2_message(message, channel).await
+                        } else {
+                            Ok(())
+                        }
+                    }
                     _ => Ok(()),
                 };
                 if let Err(e) = process_result {

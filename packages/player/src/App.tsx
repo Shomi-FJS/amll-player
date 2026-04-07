@@ -1,8 +1,8 @@
 import { Box, Theme } from "@radix-ui/themes";
 import "@radix-ui/themes/styles.css";
 import classNames from "classnames";
-import { useAtomValue } from "jotai";
-import { lazy, StrictMode, Suspense, useLayoutEffect } from "react";
+import { useAtomValue, useStore } from "jotai";
+import { lazy, StrictMode, Suspense, useEffect, useLayoutEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
@@ -19,10 +19,13 @@ import { WSProtocolMusicContext } from "./components/WSProtocolMusicContext/inde
 import { enableTaskbarLyricAtom } from "./states/appAtoms.ts";
 import "./i18n";
 import { isLyricPageOpenedAtom } from "@applemusic-like-lyrics/react-full";
+import { invoke } from "@tauri-apps/api/core";
 import { StatsComponent } from "./components/StatsComponent/index.tsx";
 import { router } from "./router.tsx";
 import {
 	displayLanguageAtom,
+	enableAlwaysOnTopAtom,
+	enableHttpServerAtom,
 	hasBackgroundAtom,
 	isDarkThemeAtom,
 	MusicContextMode,
@@ -35,6 +38,8 @@ const ExtensionContext = lazy(() => import("./components/ExtensionContext"));
 const AMLLWrapper = lazy(() => import("./components/AMLLWrapper"));
 
 function App() {
+	const store = useStore();
+
 	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
 	const showStatJSFrame = useAtomValue(showStatJSFrameAtom);
 	const enableTaskbarLyric = useAtomValue(enableTaskbarLyricAtom);
@@ -45,6 +50,20 @@ function App() {
 	const { i18n } = useTranslation();
 
 	useInitializeWindow();
+
+	useEffect(() => {
+		const enabled = store.get(enableHttpServerAtom);
+		invoke("set_http_server_enabled", { enabled }).catch((err) => {
+			console.error("同步 13533 端口控制服务状态失败", err);
+		});
+	}, [store]);
+
+	useEffect(() => {
+		const enabled = store.get(enableAlwaysOnTopAtom);
+		invoke("set_window_always_on_top", { enabled }).catch((err) => {
+			console.error("同步窗口置顶状态失败", err);
+		});
+	}, [store]);
 
 	useLayoutEffect(() => {
 		i18n.changeLanguage(displayLanguage);

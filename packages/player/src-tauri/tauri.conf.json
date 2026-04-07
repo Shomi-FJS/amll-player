@@ -23,6 +23,10 @@
 			"icons/icon.icns",
 			"icons/icon.ico"
 		],
+		"resources": [
+			"../dist/remote-index.html",
+			"../public/remote-index.html"
+		],
 		"createUpdaterArtifacts": true,
 		"android": {
 			"minSdkVersion": 26

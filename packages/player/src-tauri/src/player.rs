@@ -13,6 +13,14 @@ use tracing::warn;
 pub static PLAYER_HANDLER: LazyLock<RwLock<Option<AudioPlayerHandle>>> =
     LazyLock::new(|| RwLock::new(None));
 
+pub async fn send_player_command(msg: AudioThreadMessage) -> bool {
+    if let Some(handler) = &*PLAYER_HANDLER.read().await {
+        handler.send_anonymous(msg).await.is_ok()
+    } else {
+        false
+    }
+}
+
 #[tauri::command]
 pub async fn local_player_send_msg(msg: AudioThreadEventMessage<AudioThreadMessage>) {
     if let Some(handler) = &*PLAYER_HANDLER.read().await
