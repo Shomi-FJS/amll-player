@@ -393,7 +393,11 @@ async fn open_screenshot_window(app: AppHandle) {
 fn init_logging() {
     #[cfg(not(debug_assertions))]
     {
-        let log_file = std::fs::File::create("amll-player.log");
+        let log_path = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.join("amll-player.log")))
+            .unwrap_or_else(|| std::path::PathBuf::from("amll-player.log"));
+        let log_file = std::fs::File::create(&log_path);
         if let Ok(log_file) = log_file {
             tracing_subscriber::fmt()
                 .map_writer(move |_| log_file)

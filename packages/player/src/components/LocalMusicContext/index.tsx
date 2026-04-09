@@ -37,6 +37,7 @@ import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { type FC, useEffect, useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+import { invoke } from "@tauri-apps/api/core";
 import { db } from "../../dexie.ts";
 import { useLyricParser } from "../../hooks/useLyricParser.ts";
 import {
@@ -44,6 +45,8 @@ import {
 	currentLyricAuthorsAtom,
 	currentSongWritersAtom,
 	enableMediaControlsAtom,
+	MusicContextMode,
+	musicContextModeAtom,
 } from "../../states/appAtoms.ts";
 import {
 	SyncStatus,
@@ -516,6 +519,29 @@ export const LocalMusicContext: FC = () => {
 
 					if (newMusicId && newMusicId !== currentMusicId) {
 						await syncMusicInfo(data);
+					}
+
+					const currentMode = store.get(musicContextModeAtom);
+					if (currentMode === MusicContextMode.Local) {
+						const musicName = store.get(musicNameAtom);
+						const musicArtists = store.get(musicArtistsAtom);
+						const musicAlbum = store.get(musicAlbumNameAtom);
+						const musicCover = store.get(musicCoverAtom);
+						const isPlaying = store.get(musicPlayingAtom);
+
+						if (musicName && musicArtists.length > 0) {
+							invoke("update_remote_now_playing", {
+								info: {
+									title: musicName,
+									artist: musicArtists.map((a) => a.name).join("/"),
+									album: musicAlbum,
+									isPlaying,
+									cover: musicCover,
+								},
+							}).catch((err) => {
+								console.error("更新远程播放信息失败", err);
+							});
+						}
 					}
 					break;
 				}

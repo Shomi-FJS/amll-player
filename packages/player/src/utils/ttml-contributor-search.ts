@@ -7,7 +7,7 @@ export interface LyricMatchResult {
 	songWriters: string[];
 }
 
-const TTML_DB_BASE_URL = "https://amll-ttml-db.gbclstudio.cn/ncm-lyrics";
+const TTML_DB_BASE_URL = "https://amlldb.bikonoo.com/ncm-lyrics";
 const LOCAL_TTML_BASE_URL = "http://localhost:3000/api/ncm-lyrics";
 const CONTRIBUTOR_SOURCE_STORAGE_KEY = "amll-react-full.contributorSource";
 

@@ -578,7 +578,7 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 			setConnectedAddrs(new Set(addrs)),
 		);
 		invoke("ws_close_connection").then(() => {
-			const addr = wsProtocolListenAddr || "127.0.0.1:11444";
+			const addr = wsProtocolListenAddr || "0.0.0.0:11444";
 			invoke("ws_reopen_connection", { addr, channel: onBodyChannel });
 		});
 		return () => {

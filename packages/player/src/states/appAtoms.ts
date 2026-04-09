@@ -74,9 +74,12 @@ export const enableAlwaysOnTopAtom = atom(
 	},
 );
 
+/**
+ * WebSocket 协议的监听地址和端口。
+ */
 export const wsProtocolListenAddrAtom = atomWithStorage(
 	"amll-player.wsProtocolListenAddr",
-	"localhost:11444",
+	"0.0.0.0:11444",
 );
 
 export const showStatJSFrameAtom = atomWithStorage(
@@ -151,7 +154,7 @@ export const currentSongWritersAtom = atom<string[]>([]);
 
 const enableHttpServerInternalAtom = atomWithStorage(
 	"amll-player.enableHttpServer",
-	false,
+	true,
 );
 
 export const enableHttpServerAtom = atom(
@@ -159,7 +162,7 @@ export const enableHttpServerAtom = atom(
 	(_get, set, enabled: boolean) => {
 		set(enableHttpServerInternalAtom, enabled);
 		invoke("set_http_server_enabled", { enabled }).catch((err) => {
-			console.error("设置 HTTP 服务器状态失败", err);
+			console.error("设置 13533 端口控制服务状态失败", err);
 		});
 	},
 );

@@ -79,6 +79,14 @@ impl HttpServerController {
         let ws_server = self.ws_server.clone();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         self.shutdown_tx = Some(shutdown_tx);
+
+        // Windows 防火墙自动放行端口
+        #[cfg(target_os = "windows")]
+        {
+            add_firewall_rule("AMLL Player HTTP", 13533);
+            add_firewall_rule("AMLL Player WS", 11444);
+        }
+
         self.server_handle = Some(tokio::spawn(async move {
             run_http_server(app, ws_server, dist_dir, listener, shutdown_rx).await;
         }));
@@ -495,5 +503,39 @@ async fn run_http_server(
     });
     if let Err(e) = server.await {
         error!("HTTP 服务异常退出: {e:?}");
+    }
+}
+
+/// Windows 平台：尝试添加防火墙入站规则放行指定端口。
+/// 需要管理员权限，如果权限不足则静默失败并打印警告。
+#[cfg(target_os = "windows")]
+fn add_firewall_rule(rule_name: &str, port: u16) {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+    let output = Command::new("netsh")
+        .args([
+            "advfirewall",
+            "firewall",
+            "add",
+            "rule",
+            &format!("name={rule_name}"),
+            "dir=in",
+            "action=allow",
+            "protocol=TCP",
+            &format!("localport={port}"),
+        ])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    match output {
+        Ok(out) if out.status.success() => {
+            info!("防火墙规则已添加: {rule_name} (TCP:{port})");
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            warn!("添加防火墙规则失败: {rule_name} (TCP:{port}) - {stderr}");
+        }
+        Err(e) => {
+            warn!("执行 netsh 命令失败: {rule_name} (TCP:{port}) - {e:?}");
+        }
     }
 }

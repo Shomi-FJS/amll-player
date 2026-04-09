@@ -18,8 +18,14 @@ import { UpdateContext } from "./components/UpdateContext/index.tsx";
 import { WSProtocolMusicContext } from "./components/WSProtocolMusicContext/index.tsx";
 import { enableTaskbarLyricAtom } from "./states/appAtoms.ts";
 import "./i18n";
-import { isLyricPageOpenedAtom } from "@applemusic-like-lyrics/react-full";
+import {
+	enableLyricTranslationLineAtom,
+	isLyricPageOpenedAtom,
+	lyricSizePresetAtom,
+} from "@applemusic-like-lyrics/react-full";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { toast } from "react-toastify";
 import { StatsComponent } from "./components/StatsComponent/index.tsx";
 import { router } from "./router.tsx";
 import {
@@ -37,8 +43,78 @@ import { useInitializeWindow } from "./utils/useInitializeWindow.ts";
 const ExtensionContext = lazy(() => import("./components/ExtensionContext"));
 const AMLLWrapper = lazy(() => import("./components/AMLLWrapper"));
 
+const STARTUP_DISCLAIMER_NOTICE =
+	"免责声明与更新通告：\n特此声明：本项目的部分模块经 @Shomi-FJS 重新设计、调整。所有变更衍生功能、代码修改均为独立行为，与原始上游组织无涉责任，相关责任由本维护方独立承担。将根据更新周期，定期同步上游版本。谢谢~";
+
 function App() {
 	const store = useStore();
+
+	useEffect(() => {
+		const showWindow = async () => {
+			try {
+				const { getCurrentWindow } = await import("@tauri-apps/api/window");
+				const win = getCurrentWindow();
+				await win.show();
+			} catch (e) {
+				console.error("Failed to show window:", e);
+			}
+		};
+		showWindow();
+		if (import.meta.env.DEV) {
+			setTimeout(showWindow, 150);
+		}
+	}, []);
+
+	useEffect(() => {
+		toast.info(
+			<div
+				style={{
+					whiteSpace: "pre-line",
+					lineHeight: 1.5,
+				}}
+			>
+				{STARTUP_DISCLAIMER_NOTICE}
+			</div>,
+			{
+				containerId: "top-right-toast",
+				autoClose: 5000,
+			},
+		);
+	}, []);
+
+	useEffect(() => {
+		const unlisten = listen("remote-http-command", (event: any) => {
+			const payload = event.payload;
+			if (payload.command === "setFontSize") {
+				const newSize = payload.size as any;
+				store.set(lyricSizePresetAtom, newSize);
+
+				const sizeLabels: Record<string, string> = {
+					tiny: "超小",
+					"extra-small": "极小",
+					small: "小",
+					medium: "中",
+					large: "大",
+					"extra-large": "极大",
+					huge: "超大",
+				};
+
+				const label = sizeLabels[newSize] || newSize;
+				toast.info(`远程控制：歌词大小已设为"${label}"`, {
+					containerId: "top-right-toast",
+				});
+			} else if (payload.command === "toggleTranslation") {
+				const enabled = payload.enabled;
+				store.set(enableLyricTranslationLineAtom, enabled);
+				toast.info(`远程控制：歌词翻译已${enabled ? "开启" : "关闭"}`, {
+					containerId: "top-right-toast",
+				});
+			}
+		});
+		return () => {
+			unlisten.then((f) => f());
+		};
+	}, [store]);
 
 	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
 	const showStatJSFrame = useAtomValue(showStatJSFrameAtom);
@@ -121,6 +197,12 @@ function App() {
 						style={{
 							marginBottom: "150px",
 						}}
+					/>
+					<ToastContainer
+						theme="dark"
+						position="top-right"
+						autoClose={1800}
+						containerId="top-right-toast"
 					/>
 				</Theme>
 			</StrictMode>
