@@ -806,8 +806,8 @@ export abstract class LyricPlayerBase
 					: this.processedLines.length - 1;
 
 				const remainingTime = this.songDuration - time;
-				const DELAY_THRESHOLD = 4500;
-				const SCROLL_BEFORE_END = 3000;
+				const DELAY_THRESHOLD = 5000;
+				const SCROLL_BEFORE_END = 4500;
 				const ENERGY_THRESHOLD = 0.05;
 
 				const hasAudioEnergy = this.audioEnergy > ENERGY_THRESHOLD;
