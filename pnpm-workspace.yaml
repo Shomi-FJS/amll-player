@@ -1,5 +1,6 @@
 packages:
     - packages/*
+    - ../applemusic-like-lyrics/applemusic-like-lyrics/packages/*
 
 catalog:
     "@biomejs/biome": ^2.4.8
@@ -21,3 +22,6 @@ catalog:
     vite-plugin-wasm: ^3.6.0
     vite-plugin-babel: ^1.6.0
     jotai-babel: ^0.1.0
+    "@rolldown/plugin-babel": ^0.2.3
+    "@tsdown/css": ^0.21.9
+    tsdown: ^0.21.9

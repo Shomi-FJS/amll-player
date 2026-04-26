@@ -21,22 +21,27 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 anyhow = "1.0"
 anyhow-tauri = "1.0.0"
+axum = { version = "0.7", features = ["ws"] }
+base64 = "0.22.1"
 crossbeam-channel = "0.5.15"
 futures = "0.3.28"
 md5 = "0.7"
 urlencoding = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tokio = { version = "^1", features = [
     "rt-multi-thread",
     "macros",
     "process",
     "sync",
     "time",
+    "net",
 ] }
 tokio-tungstenite = "0.28"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
 
 tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-dialog = { version = "2" }
@@ -49,6 +54,8 @@ amll-player-core = { path = "../../player-core" }
 ws-protocol = { path = "../../ws-protocol", features = ["tracing"] }
 tauri-plugin-http = "2"
 rodio = "0.21"
+bitflags = "2.10"
+local-ip-address = "0.6.9"
 
 [dependencies.ffmpeg-next]
 version = "8"
