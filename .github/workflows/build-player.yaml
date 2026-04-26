@@ -211,7 +211,8 @@ jobs:
       - name: 构建 AMLL Full React 包
         run: |
           pnpm i --frozen-lockfile --ignore-scripts
-          pnpm --filter "player^..." run build
+          pnpm --filter "@applemusic-like-lyrics/fft" --filter "@applemusic-like-lyrics/ws-protocol" run build
+          pnpm --filter "@applemusic-like-lyrics/core" --filter "@applemusic-like-lyrics/lyric" --filter "@applemusic-like-lyrics/ttml" --filter "@applemusic-like-lyrics/react" --filter "@applemusic-like-lyrics/react-full" run build-only
           pnpm nx build player
         env:
           AMLL_GITHUB_IS_ACTION: true
@@ -348,7 +349,8 @@ jobs:
       - name: 构建 AMLL Full React 包
         run: |
           pnpm i --frozen-lockfile --ignore-scripts
-          pnpm --filter "player^..." run build
+          pnpm --filter "@applemusic-like-lyrics/fft" --filter "@applemusic-like-lyrics/ws-protocol" run build
+          pnpm --filter "@applemusic-like-lyrics/core" --filter "@applemusic-like-lyrics/lyric" --filter "@applemusic-like-lyrics/ttml" --filter "@applemusic-like-lyrics/react" --filter "@applemusic-like-lyrics/react-full" run build-only
           pnpm nx build player
         env:
           AMLL_GITHUB_IS_ACTION: true
