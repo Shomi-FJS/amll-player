@@ -13,7 +13,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { useLiveQuery } from "dexie-react-hooks";
 import { type FC, useLayoutEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { type TTMLDBLyricEntry, db } from "../../dexie.ts";
+import { db, type TTMLDBLyricEntry } from "../../dexie.ts";
 import styles from "./index.module.css";
 
 function getMetadataValue(ttml: TTMLLyric, key: string) {
@@ -138,9 +138,7 @@ export const TTMLImportDialog: FC<{
 							贡献歌词吗？前往
 							<Button
 								variant="outline"
-								onClick={() =>
-									open("https://github.com/amll-dev/amll-ttml-db")
-								}
+								onClick={() => open("https://github.com/amll-dev/amll-ttml-db")}
 								style={{
 									verticalAlign: "baseline",
 									margin: "0 0.5em",

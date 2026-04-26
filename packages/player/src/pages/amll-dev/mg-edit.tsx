@@ -1,4 +1,5 @@
 import { MeshGradientRenderer } from "@applemusic-like-lyrics/core";
+import { musicCoverAtom } from "@applemusic-like-lyrics/react-full";
 import { ArrowLeftIcon, CodeIcon } from "@radix-ui/react-icons";
 import {
 	Card,
@@ -25,7 +26,6 @@ import {
 	useState,
 } from "react";
 import { useHideNowPlayingBar } from "../../utils/uses.ts";
-import { musicCoverAtom } from "@applemusic-like-lyrics/react-full";
 
 interface ControlPointHandleState {
 	color: [number, number, number];

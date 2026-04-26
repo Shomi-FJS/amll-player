@@ -17,7 +17,8 @@
 			"play": "播放",
 			"rewindSong": "上一首",
 			"toggleFullscreen": "全熒幕 / 取消全熒幕",
-			"toggleLyrics": "顯示歌詞"
+			"toggleLyrics": "顯示歌詞",
+			"windowAlwaysOnTop": "視窗置頂"
 		},
 		"loadAudioError": "播放後端加載音頻失敗\n{error}",
 		"openMenuViaRightClick": "請右鍵歌詞介面任意位置打開目錄哦！",
@@ -37,7 +38,7 @@
 		}
 	},
 	"bottom_lyric": {
-		"lyricAuthor": "歌词作者：",
+		"lyricAuthor": "逐词创作者：",
 		"songWriter": "创作者："
 	},
 	"common": {
@@ -266,13 +267,13 @@
 			},
 			"lyricContent": {
 				"bottomLyricMode": {
-					"description": "控制歌词底部显示的歌曲创作者及歌词作者信息",
+					"description": "控制歌词底部显示的歌曲创作者及逐词创作者信息",
 					"label": "底部信息",
 					"menu": {
 						"none": "完全不显示",
-						"onlyLyricAuthors": "只显示歌词作者",
+						"onlyLyricAuthors": "只显示逐词创作者",
 						"onlySongWriters": "只显示创作者",
-						"preferLyricAuthors": "优先显示歌词作者",
+						"preferLyricAuthors": "优先显示逐词创作者",
 						"preferSongWriters": "优先显示创作者"
 					}
 				},

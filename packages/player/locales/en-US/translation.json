@@ -17,7 +17,8 @@
 			"play": "播放",
 			"rewindSong": "Previous Song",
 			"toggleFullscreen": "Enter / Exit full screen",
-			"toggleLyrics": "Lyrics"
+			"toggleLyrics": "Lyrics",
+			"windowAlwaysOnTop": "Always on Top"
 		},
 		"loadAudioError": "The player backend encountered an error when loading the audio file:\n{error}",
 		"openMenuViaRightClick": "Please right-click anywhere to open menu",

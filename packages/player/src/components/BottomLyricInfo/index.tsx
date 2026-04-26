@@ -50,7 +50,7 @@ export const BottomLyricInfo: FC = () => {
 		const renderLyrics = () => (
 			<>
 				<span className={styles.textContent}>
-					<strong>{t("bottom_lyric.lyricAuthor", "歌词作者：")}</strong>
+					<strong>{t("bottom_lyric.lyricAuthor", "逐词创作者：")}</strong>
 				</span>
 				{lyricAuthors.map((author, index) => (
 					<span key={`${author}-${index}`}>

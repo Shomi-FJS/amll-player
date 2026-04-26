@@ -35,10 +35,21 @@ import { type FC, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import {
+	contributorSourceAtom,
+	currentLyricAuthorsAtom,
+	currentSongWritersAtom,
+	lyricContributorAtom,
+	MusicContextMode,
+	musicContextModeAtom,
+	showLyricContributorAtom,
 	wsProtocolConnectedAddrsAtom,
 	wsProtocolListenAddrAtom,
 } from "../../states/appAtoms.ts";
 import { emitAudioThread } from "../../utils/player.ts";
+import {
+	type ContributorSourceMode,
+	fetchLyricContributorByNCMId,
+} from "../../utils/ttml-contributor-search.ts";
 import { FFTToLowPassContext } from "../LocalMusicContext/index.tsx";
 
 interface WSArtist {
@@ -127,6 +138,7 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 	const { t } = useTranslation();
 	const fftPlayer = useRef<FFTPlayer | undefined>(undefined);
 	const fftDataRange = useAtomValue(fftDataRangeAtom);
+	const contributorFetchTimerRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		if (!isLyricOnly) {
@@ -259,8 +271,108 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 			},
 		);
 
+		function getRemoteCommandMessage(cmd: WSCommand): string | null {
+			switch (cmd.command) {
+				case "pause":
+					return t("ws-protocol.remoteCommand.pause", "远程用户执行：暂停");
+				case "resume":
+					return t(
+						"ws-protocol.remoteCommand.resume",
+						"远程用户执行：继续播放",
+					);
+				case "forwardSong":
+					return t("ws-protocol.remoteCommand.next", "远程用户执行：下一首");
+				case "backwardSong":
+					return t("ws-protocol.remoteCommand.prev", "远程用户执行：上一首");
+				case "setVolume":
+					return t(
+						"ws-protocol.remoteCommand.volume",
+						"远程用户执行：调整音量",
+					);
+				case "seekPlayProgress":
+					return t("ws-protocol.remoteCommand.seek", "远程用户执行：调整进度");
+				case "setRepeatMode":
+					return t(
+						"ws-protocol.remoteCommand.repeat",
+						"远程用户执行：切换循环模式",
+					);
+				case "setShuffleMode":
+					return t(
+						"ws-protocol.remoteCommand.shuffle",
+						"远程用户执行：切换随机模式",
+					);
+				default:
+					return null;
+			}
+		}
+
+		function showRemoteNotification(message: string, duration = 2000) {
+			toast.info(message, {
+				containerId: "top-right-toast",
+				autoClose: duration,
+			});
+		}
+
+		// 转发远程 HTTP 控制指令（来自 13533 接口）到当前 WS 客户端
+		const unlistenRemoteHttp = listen<WSCommand>(
+			"remote-http-command",
+			(evt) => {
+				const cmd = evt.payload;
+				switch (cmd.command) {
+					case "pause":
+					case "resume":
+					case "forwardSong":
+					case "backwardSong":
+					case "setVolume":
+					case "seekPlayProgress":
+					case "setRepeatMode":
+					case "setShuffleMode":
+						sendWSCommand(cmd);
+						break;
+					default:
+						// setFontSize / toggleTranslation 等本地 UI 指令在别处处理
+						break;
+				}
+				const message = getRemoteCommandMessage(cmd);
+				if (message) {
+					showRemoteNotification(message);
+				}
+			},
+		);
+
 		let curCoverBlobUrl = "";
 		const onBodyChannel = new Channel<WSPayload>();
+
+		function updateRemoteNowPlaying() {
+			if (store.get(musicContextModeAtom) !== MusicContextMode.WSProtocol) {
+				return;
+			}
+			const musicName = store.get(musicNameAtom);
+			const musicArtists = store.get(musicArtistsAtom);
+			const musicAlbum = store.get(musicAlbumNameAtom);
+			const musicCover = store.get(musicCoverAtom);
+			const musicPlaying = store.get(musicPlayingAtom);
+
+			if (
+				!musicName ||
+				musicName === "等待连接中" ||
+				musicArtists.length === 0
+			) {
+				return;
+			}
+
+			invoke("update_remote_now_playing", {
+				info: {
+					title: musicName,
+					artist: musicArtists.map((a) => a.name).join("/"),
+					album: musicAlbum,
+					isPlaying: musicPlaying,
+					cover: musicCover,
+				},
+			}).catch((err) => {
+				console.error("更新远程播放信息失败", err);
+			});
+		}
 
 		function onBody(payload: WSPayload) {
 			if (payload.type === "ping") {
@@ -293,6 +405,36 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 						state.artists.map((v) => ({ id: v.id, name: v.name })),
 					);
 					store.set(musicPlayingPositionAtom, 0);
+
+					if (contributorFetchTimerRef.current !== null) {
+						window.clearTimeout(contributorFetchTimerRef.current);
+						contributorFetchTimerRef.current = null;
+					}
+					store.set(lyricContributorAtom, null);
+					store.set(currentLyricAuthorsAtom, []);
+					store.set(currentSongWritersAtom, []);
+					updateRemoteNowPlaying();
+					if (state.musicId) {
+						const source = store.get(
+							contributorSourceAtom,
+						) as ContributorSourceMode;
+						contributorFetchTimerRef.current = window.setTimeout(() => {
+							fetchLyricContributorByNCMId(state.musicId, source)
+								.then((result) => {
+									if (
+										result.contributor &&
+										store.get(showLyricContributorAtom)
+									) {
+										store.set(lyricContributorAtom, result.contributor);
+									}
+									store.set(currentLyricAuthorsAtom, result.lyricAuthors);
+									store.set(currentSongWritersAtom, result.songWriters);
+								})
+								.catch((err) => {
+									console.error("查询歌词贡献者失败:", err);
+								});
+						}, 500);
+					}
 					break;
 				}
 				case "setCover": {
@@ -305,26 +447,60 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 						store.set(musicCoverAtom, state.url);
 					} else {
 						const { mimeType, data: base64Data } = state.image;
-						const binaryString = atob(base64Data);
-						const bytes = new Uint8Array(binaryString.length);
-						for (let i = 0; i < binaryString.length; i++) {
-							bytes[i] = binaryString.charCodeAt(i);
+						if (!base64Data || base64Data.length === 0) {
+							store.set(musicCoverAtom, "");
+						} else {
+							// 使用 data URL 而非 blob URL，方便远程 HTTP API 跨进程使用
+							const dataUrl = `data:${mimeType};base64,${base64Data}`;
+							store.set(musicCoverAtom, dataUrl);
 						}
-						const blob = new Blob([bytes], { type: mimeType });
-
-						const url = URL.createObjectURL(blob);
-						curCoverBlobUrl = url;
-						store.set(musicCoverAtom, url);
 					}
+					updateRemoteNowPlaying();
 					break;
 				}
 				case "setLyric": {
 					let lines: WSLyricLine[];
+					let contributor: string | null = null;
+					const lyricAuthors: string[] = [];
+					const songWriters: string[] = [];
 					if (state.format === "structured") {
 						lines = state.lines;
 					} else {
 						try {
-							lines = parseTTML(state.data).lines;
+							const ttmlResult = parseTTML(state.data);
+							lines = ttmlResult.lines.map((line) => ({
+								...line,
+								words: line.words.map((word) => ({
+									...word,
+									romanWord: word.romanWord ?? "",
+								})),
+							})) as WSLyricLine[];
+							const authorMeta = ttmlResult.metadata?.find(
+								([key]) => key === "ttmlAuthorGithubLogin",
+							);
+							contributor = authorMeta?.[1]?.[0] ?? null;
+							if (ttmlResult.metadata) {
+								// metadata 项为 [key, string[]]，values 直接是字符串数组
+								for (const [key, values] of ttmlResult.metadata) {
+									if (
+										key === "ttmlAuthorGithubLogin" &&
+										Array.isArray(values)
+									) {
+										// 贡献者的 GitHub 用户名作为"逐词创作者"展示
+										lyricAuthors.push(...values);
+									} else if (
+										key === "ttmlLyricAuthors" &&
+										Array.isArray(values)
+									) {
+										lyricAuthors.push(...values);
+									} else if (
+										key === "ttmlSongWriters" &&
+										Array.isArray(values)
+									) {
+										songWriters.push(...values);
+									}
+								}
+							}
 						} catch (e) {
 							console.error(e);
 							toast.error(
@@ -341,8 +517,14 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 						...line,
 						words: line.words.map((word) => ({ ...word, obscene: false })),
 					}));
+					const hasWordLyrics = processed.some((line) => line.words.length > 0);
 					store.set(hideLyricViewAtom, processed.length === 0);
 					store.set(musicLyricLinesAtom, processed);
+					if (contributor && hasWordLyrics) {
+						store.set(lyricContributorAtom, contributor);
+					}
+					store.set(currentLyricAuthorsAtom, lyricAuthors);
+					store.set(currentSongWritersAtom, songWriters);
 					break;
 				}
 				case "progress": {
@@ -355,10 +537,12 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 				}
 				case "paused": {
 					store.set(musicPlayingAtom, false);
+					updateRemoteNowPlaying();
 					break;
 				}
 				case "resumed": {
 					store.set(musicPlayingAtom, true);
+					updateRemoteNowPlaying();
 					break;
 				}
 				case "audioData": {
@@ -403,6 +587,7 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 		return () => {
 			unlistenConnected.then((u) => u());
 			unlistenDisconnected.then((u) => u());
+			unlistenRemoteHttp.then((u) => u());
 
 			invoke("ws_close_connection");
 
@@ -433,6 +618,13 @@ export const WSProtocolMusicContext: FC<WSProtocolMusicContextProps> = ({
 				store.set(musicPlayingAtom, false);
 				store.set(musicLyricLinesAtom, []);
 				store.set(musicVolumeAtom, 1);
+				store.set(lyricContributorAtom, null);
+				store.set(currentLyricAuthorsAtom, []);
+				store.set(currentSongWritersAtom, []);
+			}
+			if (contributorFetchTimerRef.current !== null) {
+				window.clearTimeout(contributorFetchTimerRef.current);
+				contributorFetchTimerRef.current = null;
 			}
 		};
 	}, [

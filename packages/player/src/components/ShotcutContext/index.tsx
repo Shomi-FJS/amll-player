@@ -5,8 +5,8 @@ import {
 	onRequestPrevSongAtom,
 } from "@applemusic-like-lyrics/react-full";
 import {
-	type ShortcutEvent,
 	register,
+	type ShortcutEvent,
 	unregister,
 } from "@tauri-apps/plugin-global-shortcut";
 import type { Atom } from "jotai";

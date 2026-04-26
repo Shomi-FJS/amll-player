@@ -75,11 +75,14 @@ import {
 	advanceLyricDynamicLyricTimeAtom,
 	BottomLyricDisplayMode,
 	bottomLyricDisplayModeAtom,
+	contributorSourceAtom,
 	DarkMode,
 	darkModeAtom,
 	enableAlwaysOnTopAtom,
+	enableHttpServerAtom,
 	enableMediaControlsAtom,
 	enableTaskbarLyricAtom,
+	showLyricContributorAtom,
 	showStatJSFrameAtom,
 	taskbarLyricAlignSettingAtom,
 	taskbarLyricModeSettingAtom,
@@ -87,10 +90,14 @@ import {
 	updateInfoAtom,
 } from "../../states/appAtoms.ts";
 import { restartApp } from "../../utils/player.ts";
+import {
+	type ContributorSourceMode,
+	setContributorSource,
+} from "../../utils/ttml-contributor-search.ts";
 import styles from "./index.module.css";
 
 const SettingEntry: FC<
-	PropsWithChildren<{ label: string; description?: string }>
+	PropsWithChildren<{ label: string; description?: ReactNode }>
 > = ({ label, description, children }) => {
 	return (
 		<Card mt="2">
@@ -306,6 +313,11 @@ const GeneralSettings = () => {
 	const { t, i18n } = useTranslation();
 	const [mode, setMode] = useAtom(darkModeAtom);
 	const [os, setOs] = useState<string | null>(null);
+	const [localIps, setLocalIps] = useState<string[]>([]);
+
+	useLayoutEffect(() => {
+		invoke<string[]>("get_local_ips").then(setLocalIps).catch(console.error);
+	}, []);
 
 	useEffect(() => {
 		setOs(platform());
@@ -416,6 +428,17 @@ const GeneralSettings = () => {
 					</Select.Content>
 				</Select.Root>
 			</SettingEntry>
+			<SwitchSettings
+				label={t(
+					"page.settings.general.remoteHttpServer.label",
+					"启用 13533 端口控制服务",
+				)}
+				description={`${t(
+					"page.settings.general.remoteHttpServer.description",
+					"用于远程控制页面与 HTTP 接口，关闭后无法通过 13533 访问",
+				)}${localIps.length > 0 ? `\n本机 IP:\n${localIps.join("\n")}` : ""}`}
+				configAtom={enableHttpServerAtom}
+			/>
 			{os === "windows" && (
 				<SwitchSettings
 					label={t(
@@ -439,6 +462,14 @@ const LyricContentSettings = () => {
 	const [bottomLyricDisplayMode, setBottomLyricDisplayMode] = useAtom(
 		bottomLyricDisplayModeAtom,
 	);
+	const [contributorSource, setContributorSourceAtomValue] = useAtom(
+		contributorSourceAtom,
+	);
+
+	// 将 atom 当前值同步到模块内部变量（并在变动时清除查询缓存）
+	useEffect(() => {
+		setContributorSource(contributorSource as ContributorSourceMode);
+	}, [contributorSource]);
 
 	const bottomLyricMenu = useMemo(
 		() => [
@@ -452,7 +483,7 @@ const LyricContentSettings = () => {
 			{
 				label: t(
 					"page.settings.lyricContent.bottomLyricMode.menu.onlyLyricAuthors",
-					"只显示歌词作者",
+					"只显示逐词创作者",
 				),
 				value: BottomLyricDisplayMode.OnlyLyricAuthors,
 			},
@@ -466,7 +497,7 @@ const LyricContentSettings = () => {
 			{
 				label: t(
 					"page.settings.lyricContent.bottomLyricMode.menu.preferLyricAuthors",
-					"优先显示歌词作者",
+					"优先显示逐词创作者",
 				),
 				value: BottomLyricDisplayMode.PreferLyricAuthors,
 			},
@@ -511,6 +542,75 @@ const LyricContentSettings = () => {
 				)}
 				configAtom={enableLyricSwapTransRomanLineAtom}
 			/>
+			<SwitchSettings
+				label={t(
+					"page.settings.lyricContent.showLyricContributor.label",
+					"显示逐词创作者",
+				)}
+				description={t(
+					"page.settings.lyricContent.showLyricContributor.description",
+					"在歌词播放界面显示逐词创作者的 GitHub 用户名",
+				)}
+				configAtom={showLyricContributorAtom}
+			/>
+			<SettingEntry
+				label={t(
+					"page.settings.lyricContent.contributorSource.label",
+					"贡献者查询方式",
+				)}
+				description={
+					<>
+						{t(
+							"page.settings.lyricContent.contributorSource.description.part1",
+							"使用镜像源在歌词响应更快，减少闪烁情况，如需使用本地源请前往",
+						)}
+						<a
+							href="#"
+							onClick={(e) => {
+								e.preventDefault();
+								window.open(
+									"https://github.com/Shomi-FJS/Lyric-Atlas-API",
+									"_blank",
+								);
+							}}
+							style={{
+								color: "inherit",
+								textDecoration: "underline",
+								cursor: "pointer",
+							}}
+						>
+							https://github.com/Shomi-FJS/Lyric-Atlas-API
+						</a>
+						{t(
+							"page.settings.lyricContent.contributorSource.description.part2",
+							" 下载",
+						)}
+					</>
+				}
+			>
+				<Select.Root
+					value={contributorSource}
+					onValueChange={(value) =>
+						setContributorSourceAtomValue(value as ContributorSourceMode)
+					}
+				>
+					<Select.Trigger />
+					<Select.Content>
+						<Select.Item value="mirror">
+							{t(
+								"page.settings.lyricContent.contributorSource.menu.mirror",
+								"镜像源（By @GBCLStudio）",
+							)}
+						</Select.Item>
+						<Select.Item value="local">
+							{t(
+								"page.settings.lyricContent.contributorSource.menu.local",
+								"本地源（缓存服务-需手动下载服务）",
+							)}
+						</Select.Item>
+					</Select.Content>
+				</Select.Root>
+			</SettingEntry>
 
 			<Box height="1em" />
 			<SettingEntry
@@ -520,7 +620,7 @@ const LyricContentSettings = () => {
 				)}
 				description={t(
 					"page.settings.lyricContent.bottomLyricMode.description",
-					"控制歌词底部显示的歌曲创作者及歌词作者信息",
+					"控制歌词底部显示的歌曲创作者及逐词创作者信息",
 				)}
 			>
 				<Select.Root

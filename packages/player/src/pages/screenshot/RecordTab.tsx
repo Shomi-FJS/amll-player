@@ -1,21 +1,21 @@
 import {
-	Flex,
-	Text,
-	TextField,
-	Switch,
 	Button,
 	Callout,
+	Flex,
+	Switch,
+	Text,
+	TextField,
 } from "@radix-ui/themes";
+import { invoke } from "@tauri-apps/api/core";
 import { useAtom } from "jotai";
 import { useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { invoke } from "@tauri-apps/api/core";
 import {
-	resizeWindowAtom,
-	targetWidthAtom,
-	targetHeightAtom,
-	recoverWindowSizeAtom,
 	recordMediaStreamAtom,
+	recoverWindowSizeAtom,
+	resizeWindowAtom,
+	targetHeightAtom,
+	targetWidthAtom,
 } from "./states.ts";
 
 const RecordTab = () => {

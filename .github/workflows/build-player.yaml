@@ -16,6 +16,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  AMLL_DEP_REPO: https://github.com/Shomi-FJS/applemusic-like-lyrics.git
+  AMLL_DEP_BRANCH: full-refractor
+  AMLL_DEP_LOCAL_PATH: ../applemusic-like-lyrics/applemusic-like-lyrics
+
 jobs:
   clean-pre-release:
     name: 删除预发布版本的构建产物
@@ -88,6 +93,11 @@ jobs:
         name: 克隆仓库
         with:
           fetch-depth: 0 # 为了正确生成开发版本号码
+
+      - name: 克隆 AMLL 依赖仓库
+        run: |
+          git clone --branch ${{ env.AMLL_DEP_BRANCH }} --depth 1 ${{ env.AMLL_DEP_REPO }} ${{ env.AMLL_DEP_LOCAL_PATH }}
+        shell: bash
 
       - name: 安装 PNPM
         uses: pnpm/action-setup@v4
@@ -253,6 +263,11 @@ jobs:
         name: 克隆仓库
         with:
           fetch-depth: 0 # 为了正确生成开发版本号码
+
+      - name: 克隆 AMLL 依赖仓库
+        run: |
+          git clone --branch ${{ env.AMLL_DEP_BRANCH }} --depth 1 ${{ env.AMLL_DEP_REPO }} ${{ env.AMLL_DEP_LOCAL_PATH }}
+        shell: bash
 
       - name: 安装 PNPM
         uses: pnpm/action-setup@v4

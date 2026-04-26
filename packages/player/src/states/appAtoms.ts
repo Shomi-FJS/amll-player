@@ -153,3 +153,30 @@ export const currentSongWritersAtom = atom<string[]>([]);
 export const currentPlaylistAtom = atom<SongData[]>([]);
 
 export const currentPlaylistMusicIndexAtom = atom(0);
+
+export const enableHttpServerInternalAtom = atomWithStorage(
+	"amll-player.enableHttpServer",
+	true,
+);
+
+export const enableHttpServerAtom = atom(
+	(get) => get(enableHttpServerInternalAtom),
+	(_get, set, enabled: boolean) => {
+		set(enableHttpServerInternalAtom, enabled);
+		invoke("set_http_server_enabled", { enabled }).catch((err) => {
+			console.error("设置 HTTP 服务器状态失败", err);
+		});
+	},
+);
+
+export const lyricContributorAtom = atom<string | null>(null);
+
+export const showLyricContributorAtom = atomWithStorage(
+	"amll-player.showLyricContributor",
+	true,
+);
+
+export const contributorSourceAtom = atomWithStorage<"mirror" | "local">(
+	"amll-react-full.contributorSource",
+	"mirror",
+);

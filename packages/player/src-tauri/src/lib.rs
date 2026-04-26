@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::sync::{Arc, LazyLock, RwLock as StdRwLock};
 
 use amll_player_core::AudioInfo;
 use anyhow::Context;
@@ -7,13 +8,15 @@ use serde::*;
 use serde_json::Value;
 use tauri::{
     AppHandle, Manager, PhysicalSize, Runtime, Size, State, WebviewWindowBuilder, ipc::Channel,
-    path::BaseDirectory, utils::config::WindowEffectsConfig, window::Effect,
+    path::BaseDirectory,
+    utils::config::WindowEffectsConfig, window::Effect,
 };
 use tokio::sync::RwLock;
 use tracing::*;
 
 use crate::server::AMLLWebSocketServer;
 
+mod http_server;
 mod player;
 mod screen_capture;
 mod server;
@@ -23,8 +26,10 @@ mod taskbar_lyric;
 #[cfg(target_os = "windows")]
 mod theme_watcher;
 
-pub type AMLLWebSocketServerWrapper = RwLock<AMLLWebSocketServer>;
+pub type AMLLWebSocketServerWrapper = Arc<RwLock<AMLLWebSocketServer>>;
 pub type AMLLWebSocketServerState<'r> = State<'r, AMLLWebSocketServerWrapper>;
+pub type HttpServerControllerWrapper = Arc<RwLock<http_server::HttpServerController>>;
+pub type HttpServerControllerState<'r> = State<'r, HttpServerControllerWrapper>;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -60,8 +65,53 @@ async fn ws_broadcast_payload(
 }
 
 #[tauri::command]
+async fn set_http_server_enabled(
+    enabled: bool,
+    state: HttpServerControllerState<'_>,
+) -> Result<(), String> {
+    state.write().await.set_enabled(enabled).await;
+    Ok(())
+}
+
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteNowPlayingInfo {
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub is_playing: bool,
+    pub cover: Option<String>,
+}
+
+pub static REMOTE_NOW_PLAYING: LazyLock<StdRwLock<Option<RemoteNowPlayingInfo>>> =
+    LazyLock::new(|| StdRwLock::new(None));
+
+#[tauri::command]
+async fn update_remote_now_playing(info: RemoteNowPlayingInfo) {
+    if let Ok(mut guard) = REMOTE_NOW_PLAYING.write() {
+        guard.replace(info);
+    }
+}
+
+#[tauri::command]
 fn restart_app<R: Runtime>(app: AppHandle<R>) {
     tauri::process::restart(&app.env())
+}
+
+#[tauri::command]
+fn get_local_ips() -> Result<Vec<String>, String> {
+    use local_ip_address::list_afinet_netifas;
+    let interfaces = list_afinet_netifas().map_err(|e| e.to_string())?;
+    let ips = interfaces
+        .into_iter()
+        .filter_map(|(_, ip)| match ip {
+            std::net::IpAddr::V4(ipv4) if !ipv4.is_loopback() && !ipv4.is_link_local() => {
+                Some(ipv4.to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    Ok(ips)
 }
 
 #[tauri::command]
@@ -419,6 +469,8 @@ pub fn run() {
             ws_get_connections,
             ws_broadcast_payload,
             ws_close_connection,
+            set_http_server_enabled,
+            update_remote_now_playing,
             open_screenshot_window,
             screen_capture::take_screenshot,
             player::local_player_send_msg,
@@ -426,6 +478,7 @@ pub fn run() {
             resolve_content_uri,
             read_local_music_metadata,
             restart_app,
+            get_local_ips,
             #[cfg(target_os = "windows")]
             set_window_always_on_top,
             #[cfg(target_os = "windows")]
@@ -465,9 +518,12 @@ pub fn run() {
             let _ = app
                 .handle()
                 .plugin(tauri_plugin_global_shortcut::Builder::new().build());
-            app.manage::<AMLLWebSocketServerWrapper>(RwLock::new(AMLLWebSocketServer::new(
+            let ws_server = Arc::new(RwLock::new(AMLLWebSocketServer::new(app.handle().clone())));
+            app.manage::<AMLLWebSocketServerWrapper>(ws_server.clone());
+            let http_server = Arc::new(RwLock::new(http_server::HttpServerController::new(
                 app.handle().clone(),
             )));
+            app.manage::<HttpServerControllerWrapper>(http_server.clone());
             #[cfg(not(mobile))]
             {
                 tauri::async_runtime::block_on(recreate_window(app.handle(), "main", None));
