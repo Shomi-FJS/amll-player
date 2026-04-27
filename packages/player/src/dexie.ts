@@ -10,6 +10,18 @@ export interface Playlist {
 	updateTime: number;
 	playTime: number;
 	songIds: string[];
+	/**
+	 * 若该歌单是通过 Android「扫描指定文件夹建立索引」方式创建的，
+	 * 这里会保存当时选定的 SAF tree URI（形如 `content://...tree/...`）。
+	 *
+	 * 后续在歌单详情页可以拿它再次调用 `scan_audio_in_tree_uri`
+	 * 重新枚举原目录下的音频文件，从而把新增 / 改名的歌曲增量同步进来。
+	 *
+	 * 字段未填表示该歌单不是文件夹扫描来源的，刷新按钮也不会显示。
+	 */
+	folderScanTreeUri?: string;
+	/** 配 `folderScanTreeUri`：false=仅本层，true/undefined=递归。 */
+	folderScanRecursive?: boolean;
 }
 
 export interface Song {
