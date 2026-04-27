@@ -83,8 +83,29 @@
 	"newPlaylist": {
 		"buttonLabel": "新建播放列表",
 		"dialog": {
+			"folderScan": {
+				"dialogTitle": "选择要扫描的音乐文件夹",
+				"depthLabel": "扫描范围",
+				"depth": {
+					"recursive": "包含所有子文件夹（推荐）",
+					"shallow": "仅扫描所选文件夹本层"
+				},
+				"toast": {
+					"empty": "未在所选文件夹中找到任何音频文件",
+					"pickerFailed": "无法打开文件夹选择器：{error}",
+					"scanFailed": "扫描文件夹失败：{error}",
+					"scanning": "正在扫描文件夹中的音频文件..."
+				}
+			},
 			"name": "歌单名称",
 			"namePlaceholder": "歌单名称",
+			"source": {
+				"androidFolderScan": "扫描指定文件夹建立索引（Android）",
+				"androidMedia": "安卓内容提供者 - 音频媒体源（暂未实现）",
+				"local": "本地歌曲源"
+			},
+			"sourceLabel": "歌单管理源",
+			"sourcePlaceholder": "歌单管理源",
 			"title": "新建歌单"
 		}
 	},
@@ -129,13 +150,43 @@
 					"failedDescription": "以下 {count, plural, other {#}} 首歌曲添加失败：",
 					"failedTitle": "部分歌曲导入失败"
 				},
+				"dialogTitle": "选择本地音乐",
 				"filterName": "音频文件",
 				"label": "添加本地歌曲",
 				"toast": {
 					"allFailed": "{errored, plural, other {#}} 首歌曲添加失败",
+					"canceled": "已取消导入，已添加 {count, plural, other {#}} 首歌曲",
 					"parsingMusicMetadata": "正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
 					"partiallyFailed": "已添加 {succeed, plural, other {#}} 首歌曲，其中 {errored, plural, other {#}} 首歌曲添加失败",
 					"success": "已全部添加 {count, plural, other {#}} 首歌曲"
+				}
+			},
+			"addLocalMusicFolder": {
+				"dialogTitle": "选择音乐文件夹",
+				"label": "添加本地文件夹",
+				"toast": {
+					"empty": "未在所选文件夹中找到任何音频文件",
+					"scanFailed": "扫描文件夹失败：{error}",
+					"scanning": "正在扫描文件夹中的音频文件..."
+				}
+			},
+			"folderScanRefresh": {
+				"label": "刷新文件夹",
+				"link": "关联到本地文件夹",
+				"relink": "重新关联本地文件夹",
+				"unlink": "解除文件夹关联",
+				"depthDialog": {
+					"title": "选择扫描范围",
+					"description": "决定本次扫描是否要进入所选目录下的子文件夹。"
+				},
+				"toast": {
+					"canceling": "正在取消...",
+					"empty": "该文件夹下未找到任何音频文件",
+					"linked": "已关联本地文件夹，开始扫描...",
+					"scanCanceled": "已取消扫描",
+					"scanFailed": "重新扫描失败：{error}",
+					"scanning": "正在重新扫描文件夹...",
+					"unlinked": "已解除该歌单的文件夹关联"
 				}
 			},
 			"cover": {
