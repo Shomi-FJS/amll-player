@@ -30,7 +30,7 @@ const PlaylistSongItem: FC<
 	const [cover, setCover] = useState("");
 	const setPlaylistIndex = useSetAtom(currentPlaylistMusicIndexAtom);
 
-	const song: Song | null = useMemo(() => {
+	const customSong: Song | null = useMemo(() => {
 		if (songData.type === "custom" && songData.songJsonData) {
 			try {
 				return JSON.parse(songData.songJsonData);
@@ -42,18 +42,39 @@ const PlaylistSongItem: FC<
 		return null;
 	}, [songData]);
 
+	const [localSong, setLocalSong] = useState<Song | null>(null);
+
 	useLayoutEffect(() => {
 		let newUri: string | null = null;
 		let isActive = true;
 
-		if (song) {
-			db.songs.get(song.id).then((dbSong) => {
-				if (isActive && dbSong?.cover instanceof Blob) {
-					newUri = URL.createObjectURL(dbSong.cover);
-					setCover(newUri);
-				}
+		const applyCover = (cover?: Blob) => {
+			if (cover instanceof Blob) {
+				newUri = URL.createObjectURL(cover);
+				setCover(newUri);
+			} else {
+				setCover("");
+			}
+		};
+
+		if (customSong) {
+			setLocalSong(null);
+			db.songs.get(customSong.id).then((dbSong) => {
+				if (!isActive) return;
+				applyCover(dbSong?.cover);
 			});
+		} else if (songData.type === "local") {
+			db.songs
+				.where("filePath")
+				.equals(songData.filePath)
+				.first()
+				.then((dbSong) => {
+					if (!isActive) return;
+					setLocalSong(dbSong ?? null);
+					applyCover(dbSong?.cover);
+				});
 		} else {
+			setLocalSong(null);
 			setCover("");
 		}
 
@@ -63,12 +84,18 @@ const PlaylistSongItem: FC<
 				URL.revokeObjectURL(newUri);
 			}
 		};
-	}, [song]);
+	}, [customSong, songData]);
 
-	const name =
-		song?.songName ??
-		(songData.type === "local" ? songData.filePath : "未知歌曲");
-	const artists = song?.songArtists ?? "未知艺术家";
+	const song = customSong ?? localSong;
+	const fallbackName =
+		songData.type === "local"
+			? (songData.filePath.split(/[\\/]/).pop() ?? songData.filePath).replace(
+					/\.[^.]+$/,
+					"",
+				)
+			: "未知歌曲";
+	const name = song?.songName?.trim() || fallbackName;
+	const artists = song?.songArtists?.trim() || "未知艺术家";
 
 	return (
 		<div className={className} {...props}>

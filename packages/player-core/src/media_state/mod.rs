@@ -6,6 +6,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(target_os = "android")]
+mod android;
 
 pub enum MediaStateMessage {
     Play,
@@ -28,11 +30,11 @@ pub(super) trait MediaStateManagerBackend: Sized + Send + Sync + Debug {
     fn update(&self) -> anyhow::Result<()>;
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
 #[derive(Debug)]
 pub struct EmptyMediaStateManager;
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
 impl MediaStateManagerBackend for EmptyMediaStateManager {
     fn new() -> anyhow::Result<(Self, UnboundedReceiver<MediaStateMessage>)> {
         Ok((Self, tokio::sync::mpsc::unbounded_channel().1))
@@ -75,5 +77,7 @@ impl MediaStateManagerBackend for EmptyMediaStateManager {
 pub type MediaStateManager = windows::MediaStateManagerWindowsBackend;
 #[cfg(target_os = "macos")]
 pub type MediaStateManager = macos::MediaStateManagerMacOSBackend;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(target_os = "android")]
+pub type MediaStateManager = android::MediaStateManagerAndroidBackend;
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
 pub type MediaStateManager = EmptyMediaStateManager;

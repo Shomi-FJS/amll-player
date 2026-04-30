@@ -83,8 +83,25 @@
 	"newPlaylist": {
 		"buttonLabel": "New Playlist",
 		"dialog": {
-			"name": "歌单名称",
+			"folderScan": {
+				"depth": {
+					"recursive": "Include all subfolders (recommended)",
+					"shallow": "Only scan the selected folder"
+				},
+				"depthLabel": "Scan depth",
+				"toast": {
+					"pickerFailed": "Failed to open folder picker: {error}"
+				}
+			},
+			"name": "Playlist Name",
 			"namePlaceholder": "Playlist Title",
+			"source": {
+				"androidFolderScan": "Scan a folder to build an index (Android)",
+				"androidMedia": "Android content provider - audio media (not yet implemented)",
+				"local": "Local song source"
+			},
+			"sourceLabel": "Playlist source",
+			"sourcePlaceholder": "Playlist source",
 			"title": "New Playlist"
 		}
 	},
@@ -129,18 +146,43 @@
 					"failedDescription": "The following {count, plural, other {#}} failed to be added:",
 					"failedTitle": "Some songs failed to import"
 				},
+				"dialogTitle": "Pick local music",
 				"filterName": "Audio File",
 				"label": "Add Music From Disk",
 				"toast": {
 					"allFailed": "{errored, plural, other {#}} songs failed to be added",
+					"canceled": "Import canceled, {count, plural, other {#}} song(s) added",
 					"parsingMusicMetadata": "Parsing metadata to add your track into playlist ({current, plural, other {#}} / {total, plural, other {#}})",
 					"partiallyFailed": "{succeed, plural, =0 {No song is} one {A song is} other {# songs}} added, but {errored, plural, =0 {no song is} one {a song is} other {# songs are}} failed to be added",
 					"success": "{count, plural, other {#}} song(s) added"
 				}
 			},
+			"addLocalMusicFolder": {
+				"label": "Add Music Folder"
+			},
 			"cover": {
 				"changeCoverToAuto": "Use automatic cover",
 				"uploadCoverImage": "Upload your own cover art"
+			},
+			"folderScanRefresh": {
+				"depthDialog": {
+					"recursive": "Include all subfolders",
+					"shallow": "Only scan the selected folder",
+					"title": "Pick scan depth"
+				},
+				"label": "Refresh Folder",
+				"link": "Link to a local folder",
+				"relink": "Relink to a local folder",
+				"toast": {
+					"canceling": "Canceling...",
+					"empty": "No audio files found in this folder",
+					"linked": "Folder linked, scanning...",
+					"scanCanceled": "Scan canceled",
+					"scanFailed": "Failed to rescan: {error}",
+					"scanning": "Rescanning folder...",
+					"unlinked": "Folder unlinked from this playlist"
+				},
+				"unlink": "Unlink folder"
 			},
 			"music": {
 				"dropdown": {

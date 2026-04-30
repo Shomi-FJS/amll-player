@@ -40,6 +40,16 @@ export const lyricDBVersionAtom = atomWithStorage<string | null>(
 	{ getOnInit: true },
 );
 
+/**
+ * 歌词库的完整性校验版本，用于检测是否需要重新同步
+ */
+export const lyricDBIntegrityVersionAtom = atomWithStorage<string | null>(
+	"amll-player.lyricDBIntegrityVersion",
+	null,
+	undefined,
+	{ getOnInit: true },
+);
+
 export const advanceLyricDynamicLyricTimeAtom = atomWithStorage(
 	"amll-player.advanceLyricDynamicLyricTimeAtom",
 	false,

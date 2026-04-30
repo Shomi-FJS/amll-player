@@ -1,15 +1,16 @@
 use tauri::AppHandle;
+#[cfg(not(mobile))]
 use tauri::Manager;
 
 use anyhow_tauri::IntoTAResult;
 
 #[tauri::command]
 pub async fn take_screenshot(
-    app: AppHandle,
-    resize_window: bool,
-    target_width: u32,
-    target_height: u32,
-    recover_size: bool,
+    _app: AppHandle,
+    _resize_window: bool,
+    _target_width: u32,
+    _target_height: u32,
+    _recover_size: bool,
 ) -> anyhow_tauri::TAResult<String> {
     #[cfg(mobile)]
     {
@@ -17,7 +18,7 @@ pub async fn take_screenshot(
     }
     #[cfg(not(mobile))]
     {
-        let win = app.get_webview_window("main");
+        let win = _app.get_webview_window("main");
 
         let win = if let Some(win) = win {
             win
@@ -26,10 +27,10 @@ pub async fn take_screenshot(
         };
 
         let orig_size = win.inner_size().into_ta_result()?;
-        if resize_window {
+        if _resize_window {
             win.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                target_width,
-                target_height,
+                _target_width,
+                _target_height,
             )))
             .into_ta_result()?;
             win.set_resizable(false).into_ta_result()?;
@@ -127,7 +128,7 @@ pub async fn take_screenshot(
                 //     .await
                 //     .context("Failed to set viewport size")?;
 
-                if resize_window {
+                if _resize_window {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
                 dev_tools_runner.take_screenshot().await
@@ -142,8 +143,8 @@ pub async fn take_screenshot(
 
         let result = result.into_ta_result()?;
 
-        if resize_window {
-            if recover_size {
+        if _resize_window {
+            if _recover_size {
                 win.set_size(tauri::Size::Physical(orig_size))
                     .into_ta_result()?;
             }

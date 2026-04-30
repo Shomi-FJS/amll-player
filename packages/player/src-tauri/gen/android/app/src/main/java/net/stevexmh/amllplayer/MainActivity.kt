@@ -2,6 +2,7 @@ package net.stevexmh.amllplayer
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -9,19 +10,70 @@ import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
+    private val directoryPickerLauncher: ActivityResultLauncher<Uri?> =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            pendingDirectoryResult = uri?.toString()
+            pendingDirectoryLatch?.countDown()
+            pendingDirectoryLatch = null
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         setupImmersiveUi()
         super.onCreate(savedInstanceState)
-
+        instance = this
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    override fun onDestroy() {
+        if (instance === this) {
+            instance = null
+        }
+        super.onDestroy()
+    }
+
+    companion object {
+        @Volatile
+        private var instance: MainActivity? = null
+
+        @Volatile
+        private var pendingDirectoryLatch: CountDownLatch? = null
+
+        @Volatile
+        private var pendingDirectoryResult: String? = null
+
+        @JvmStatic
+        fun getInstance(): MainActivity? = instance
+
+        @JvmStatic
+        fun pickDirectoryTree(): String? {
+            val activity = instance ?: return null
+            pendingDirectoryLatch?.countDown()
+            val latch = CountDownLatch(1)
+            pendingDirectoryLatch = latch
+            pendingDirectoryResult = null
+            activity.runOnUiThread {
+                try {
+                    activity.directoryPickerLauncher.launch(null)
+                } catch (e: Throwable) {
+                    pendingDirectoryResult = null
+                    latch.countDown()
+                }
+            }
+            latch.await(10, TimeUnit.MINUTES)
+            return pendingDirectoryResult
+        }
     }
 
     override fun onResume() {

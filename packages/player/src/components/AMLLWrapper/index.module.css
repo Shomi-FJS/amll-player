@@ -25,3 +25,18 @@
 		border-radius: 0 0 0 0;
 	}
 }
+
+.returnToCoverArea {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: clamp(80px, 14vh, 180px);
+	z-index: 10;
+	cursor: pointer;
+	touch-action: manipulation;
+
+	@media screen and (orientation: landscape) {
+		display: none;
+	}
+}
