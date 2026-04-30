@@ -27,6 +27,11 @@ export function getLyricFormatFromExtension(filename: string): string | null {
 			return "qrc";
 		case "lys":
 			return "lys";
+		// LRC A2 也可能用 .lrc，无法仅靠扩展名区分；约定 .alrc 走 A2，普通 .lrc 走标准 LRC。
+		case "alrc":
+			return "lrcA2";
+		case "lyl":
+			return "lyl";
 		case "ttml":
 			return "ttml";
 		default:

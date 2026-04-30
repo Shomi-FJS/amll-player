@@ -83,9 +83,30 @@
 	"newPlaylist": {
 		"buttonLabel": "Tạo danh sách phát mới.",
 		"dialog": {
-			"name": "歌单名称",
+			"name": "Tên playlist",
 			"namePlaceholder": "Tên playlist",
-			"title": "Tạo playlist mới"
+			"title": "Tạo playlist mới",
+			"folderScan": {
+				"dialogTitle": "Chọn thư mục nhạc để quét",
+				"depthLabel": "Phạm vi quét",
+				"depth": {
+					"recursive": "Bao gồm tất cả thư mục con (khuyên dùng)",
+					"shallow": "Chỉ quét thư mục đã chọn"
+				},
+				"toast": {
+					"empty": "Không tìm thấy tệp âm thanh nào trong thư mục đã chọn",
+					"pickerFailed": "Không thể mở trình chọn thư mục: {error}",
+					"scanFailed": "Quét thư mục thất bại: {error}",
+					"scanning": "Đang quét tệp âm thanh trong thư mục..."
+				}
+			},
+			"source": {
+				"androidFolderScan": "Quét thư mục để lập chỉ mục (Android)",
+				"androidMedia": "Android Content Provider - phương tiện âm thanh (chưa hỗ trợ)",
+				"local": "Nguồn bài hát cục bộ"
+			},
+			"sourceLabel": "Nguồn danh sách phát",
+			"sourcePlaceholder": "Nguồn danh sách phát"
 		}
 	},
 	"page": {
@@ -152,7 +173,35 @@
 			},
 			"playAll": "Phát tất cả",
 			"shufflePlayAll": "Phát ngẫu nhiên",
-			"totalMusicLabel": "{count, plural, other {#}} bài hát"
+			"totalMusicLabel": "{count, plural, other {#}} bài hát",
+			"addLocalMusicFolder": {
+				"dialogTitle": "Chọn thư mục nhạc",
+				"label": "Thêm thư mục cục bộ",
+				"toast": {
+					"empty": "Không tìm thấy tệp âm thanh nào trong thư mục đã chọn",
+					"scanFailed": "Quét thư mục thất bại: {error}",
+					"scanning": "Đang quét tệp âm thanh trong thư mục..."
+				}
+			},
+			"folderScanRefresh": {
+				"label": "Làm mới thư mục",
+				"link": "Liên kết tới thư mục cục bộ",
+				"relink": "Liên kết lại thư mục cục bộ",
+				"unlink": "Hủy liên kết thư mục",
+				"depthDialog": {
+					"title": "Chọn phạm vi quét",
+					"description": "Chọn xem lần quét này có vào các thư mục con hay không."
+				},
+				"toast": {
+					"canceling": "Đang hủy...",
+					"empty": "Thư mục này không có tệp âm thanh nào",
+					"linked": "Đã liên kết thư mục, bắt đầu quét...",
+					"scanCanceled": "Đã hủy quét",
+					"scanFailed": "Quét lại thất bại: {error}",
+					"scanning": "Đang quét lại thư mục...",
+					"unlinked": "Đã hủy liên kết thư mục khỏi danh sách phát này"
+				}
+			}
 		},
 		"search": {
 			"filter": {
@@ -409,6 +458,8 @@
 				"lyricFormat": {
 					"eslrc": "Lời bài hát định dạng ESLyRiC (eslrc)",
 					"lrc": "Lời bài hát định dạng LyRiC (lrc)",
+					"lrcA2": "LRC A2 (LRC mở rộng)",
+					"lyl": "Lyricify Lines (lyl)",
 					"lys": "Lời bài hát định dạng Lyricify Syllable (lys)",
 					"none": "Không có lời bài hát",
 					"qrc": "Lời bài hát định dạng QRC",

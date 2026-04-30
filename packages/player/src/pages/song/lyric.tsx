@@ -172,6 +172,16 @@ export const LyricTabContent: FC = () => {
 									Lyricify Syllable 歌词
 								</Trans>
 							</Select.Item>
+							<Select.Item value="lrcA2">
+								<Trans i18nKey="page.song.lyric.lyricFormat.lrcA2">
+									LRC A2（增强 LRC）
+								</Trans>
+							</Select.Item>
+							<Select.Item value="lyl">
+								<Trans i18nKey="page.song.lyric.lyricFormat.lyl">
+									Lyricify Lines
+								</Trans>
+							</Select.Item>
 							<Select.Item value="ttml">
 								<Trans i18nKey="page.song.lyric.lyricFormat.ttml">
 									TTML 歌词

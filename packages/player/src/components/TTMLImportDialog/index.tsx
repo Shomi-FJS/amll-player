@@ -13,35 +13,86 @@ import { open } from "@tauri-apps/plugin-shell";
 import { useLiveQuery } from "dexie-react-hooks";
 import { type FC, useLayoutEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { type TTMLDBLyricEntry, db } from "../../dexie.ts";
+import { db, type TTMLDBLyricEntry } from "../../dexie.ts";
 import styles from "./index.module.css";
 
-function getMetadataValue(ttml: TTMLLyric, key: string) {
-	let result = "";
+function getMetadataValues(ttml: TTMLLyric, key: string) {
+	const result: string[] = [];
 	for (const [k, v] of ttml.metadata) {
 		if (k === key) {
-			result += v.join(", ");
+			result.push(...v);
 		}
 	}
 	return result;
 }
 
+function normalizeSearchText(text: string) {
+	return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isSearchTextIncluded(text: string, query: string) {
+	const normalizedText = normalizeSearchText(text);
+	const normalizedQuery = normalizeSearchText(query);
+	if (normalizedText.includes(normalizedQuery)) return true;
+
+	return normalizedText
+		.replace(/\s+/g, "")
+		.includes(normalizedQuery.replace(/\s+/g, ""));
+}
+
+function isPatternMatch(text: string, pattern: string | RegExp) {
+	if (pattern instanceof RegExp) {
+		return pattern.test(text);
+	}
+	return isSearchTextIncluded(text, pattern);
+}
+
+function isArtistTitleSearchMatch(
+	query: string,
+	songNames: string[],
+	songArtists: string[],
+) {
+	const parts = query
+		.split(/\s+-\s+/)
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0);
+	if (parts.length !== 2) return false;
+
+	const [left, right] = parts;
+	const nameMatches = (part: string) =>
+		songNames.some((name) => isSearchTextIncluded(name, part));
+	const artistMatches = (part: string) =>
+		songArtists.some((artist) => isSearchTextIncluded(artist, part));
+
+	return (
+		(artistMatches(left) && nameMatches(right)) ||
+		(nameMatches(left) && artistMatches(right))
+	);
+}
+
 function isTTMLEntryMatch(
 	entry: TTMLDBLyricEntry,
 	patterns: (string | RegExp)[],
+	query = "",
 ) {
+	const songNames = getMetadataValues(entry.content, "musicName");
+	const songArtists = getMetadataValues(entry.content, "artists");
 	const result = {
 		name: entry.name,
 		raw: entry.raw,
-		songName: getMetadataValue(entry.content, "musicName"),
-		songArtists: getMetadataValue(entry.content, "artists"),
+		songName: songNames.join(", "),
+		songArtists: songArtists.join(", "),
 		matchedLinePreview: [] as string[],
 	};
+
+	if (query && isArtistTitleSearchMatch(query, songNames, songArtists)) {
+		return result;
+	}
 
 	for (const pattern of patterns) {
 		for (let i = 0; i < entry.content.lines.length; i++) {
 			const text = entry.content.lines[i].words.map((w) => w.word).join("");
-			const matched = text.toLowerCase().match(pattern);
+			const matched = isPatternMatch(text, pattern);
 			if (matched) {
 				result.matchedLinePreview = entry.content.lines
 					.slice(i, i + 3)
@@ -52,16 +103,16 @@ function isTTMLEntryMatch(
 		if (result.matchedLinePreview.length > 0) {
 			return result;
 		}
-		if (result.songName.match(pattern)) {
+		if (isPatternMatch(result.songName, pattern)) {
 			return result;
 		}
-		if (`${result.songName} - ${result.songArtists}`.match(pattern)) {
+		if (isPatternMatch(`${result.songName} - ${result.songArtists}`, pattern)) {
 			return result;
 		}
-		if (`${result.songArtists} - ${result.songName}`.match(pattern)) {
+		if (isPatternMatch(`${result.songArtists} - ${result.songName}`, pattern)) {
 			return result;
 		}
-		if (result.songArtists.match(pattern)) {
+		if (isPatternMatch(result.songArtists, pattern)) {
 			return result;
 		}
 	}
@@ -87,11 +138,13 @@ export const TTMLImportDialog: FC<{
 			return db.ttmlDB
 				.toCollection()
 				.reverse()
-				.filter((x) => !!isTTMLEntryMatch(x, [pattern]))
+				.filter((x) => !!isTTMLEntryMatch(x, [pattern], words))
 				.limit(10)
 				.sortBy("name")
 				.then((x) =>
-					x.map((x) => isTTMLEntryMatch(x, [pattern])).filter((v) => !!v),
+					x
+						.map((x) => isTTMLEntryMatch(x, [pattern], words))
+						.filter((v) => !!v),
 				);
 		}
 		return [];
@@ -138,9 +191,7 @@ export const TTMLImportDialog: FC<{
 							贡献歌词吗？前往
 							<Button
 								variant="outline"
-								onClick={() =>
-									open("https://github.com/amll-dev/amll-ttml-db")
-								}
+								onClick={() => open("https://github.com/amll-dev/amll-ttml-db")}
 								style={{
 									verticalAlign: "baseline",
 									margin: "0 0.5em",

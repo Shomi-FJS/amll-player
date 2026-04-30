@@ -63,3 +63,6 @@ identifier = "fs:read-app-specific-dirs-recursive"
 identifier = "fs:create-app-specific-dirs"
 [[permissions]]
 identifier = "dialog:default"
+[[permissions]]
+identifier = "http:default"
+allow = []

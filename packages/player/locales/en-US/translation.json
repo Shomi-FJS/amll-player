@@ -83,9 +83,30 @@
 	"newPlaylist": {
 		"buttonLabel": "New Playlist",
 		"dialog": {
-			"name": "歌单名称",
+			"name": "Playlist Name",
 			"namePlaceholder": "Playlist Title",
-			"title": "New Playlist"
+			"title": "New Playlist",
+			"folderScan": {
+				"dialogTitle": "Pick a music folder to scan",
+				"depthLabel": "Scan depth",
+				"depth": {
+					"recursive": "Include all subfolders (recommended)",
+					"shallow": "Only scan the selected folder"
+				},
+				"toast": {
+					"empty": "No audio files found in the selected folder",
+					"pickerFailed": "Failed to open folder picker: {error}",
+					"scanFailed": "Failed to scan folder: {error}",
+					"scanning": "Scanning audio files in folder..."
+				}
+			},
+			"source": {
+				"androidFolderScan": "Scan a folder to build an index (Android)",
+				"androidMedia": "Android content provider - audio media (not yet implemented)",
+				"local": "Local song source"
+			},
+			"sourceLabel": "Playlist source",
+			"sourcePlaceholder": "Playlist source"
 		}
 	},
 	"page": {
@@ -152,7 +173,35 @@
 			},
 			"playAll": "Play All",
 			"shufflePlayAll": "Shuffle",
-			"totalMusicLabel": "{count, plural, other {#}} song(s)"
+			"totalMusicLabel": "{count, plural, other {#}} song(s)",
+			"addLocalMusicFolder": {
+				"dialogTitle": "Pick a music folder",
+				"label": "Add Music Folder",
+				"toast": {
+					"empty": "No audio files found in the selected folder",
+					"scanFailed": "Failed to scan folder: {error}",
+					"scanning": "Scanning audio files in folder..."
+				}
+			},
+			"folderScanRefresh": {
+				"label": "Refresh Folder",
+				"link": "Link to a local folder",
+				"relink": "Relink to a local folder",
+				"unlink": "Unlink folder",
+				"depthDialog": {
+					"title": "Pick scan depth",
+					"description": "Choose whether this scan should descend into subfolders."
+				},
+				"toast": {
+					"canceling": "Canceling...",
+					"empty": "No audio files found in this folder",
+					"linked": "Folder linked, scanning...",
+					"scanCanceled": "Scan canceled",
+					"scanFailed": "Failed to rescan: {error}",
+					"scanning": "Rescanning folder...",
+					"unlinked": "Folder unlinked from this playlist"
+				}
+			}
 		},
 		"search": {
 			"filter": {
@@ -306,6 +355,31 @@
 				"subtitle": "Lyrics Font Settings",
 				"tip": "This option only affect LYRIC's font but other parts."
 			},
+			"lyricSources": {
+				"addCustom": "Add custom source",
+				"builtin": {
+					"amlldb": {
+						"description": "Match against the synced AMLL TTML DB by song metadata",
+						"name": "AMLLDB"
+					},
+					"local": {
+						"description": "Scan ttml / lrc / yrc files alongside the audio file",
+						"name": "Local lyrics"
+					}
+				},
+				"custom": {
+					"description": "Fetch lyrics via URL template, supports {songName}, {songArtists}, {songAlbum}"
+				},
+				"customDefaultName": "Custom lyric source",
+				"delete": "Delete",
+				"description": "When importing local music, sources below are tried in order; failures fall back to the next.",
+				"format": {
+					"auto": "Auto-detect format"
+				},
+				"moveDown": "Move down",
+				"moveUp": "Move up",
+				"subtitle": "Lyric sources"
+			},
 			"musicInfoAppearance": {
 				"fftDataRange": {
 					"description": "The unit is Hertz, which will affect the display effect of audio visualization and background jumping rhythm effect.",
@@ -409,6 +483,8 @@
 				"lyricFormat": {
 					"eslrc": "LyRiC format used by ESLyric (LRC)",
 					"lrc": "LyRiC format (LRC)",
+					"lrcA2": "LRC A2 (enhanced LRC)",
+					"lyl": "Lyricify Lines",
 					"lys": "Lyricify Syllable lyrics",
 					"none": "No Lyrics",
 					"qrc": "QRC lyrics",

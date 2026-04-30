@@ -1,20 +1,20 @@
 import {
-	Flex,
+	Button,
 	Callout,
+	Flex,
+	Switch,
 	Text,
 	TextField,
-	Switch,
-	Button,
 } from "@radix-ui/themes";
+import { invoke } from "@tauri-apps/api/core";
 import { useAtom } from "jotai";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { invoke } from "@tauri-apps/api/core";
 import {
-	resizeWindowAtom,
-	targetWidthAtom,
-	targetHeightAtom,
 	recoverWindowSizeAtom,
+	resizeWindowAtom,
+	targetHeightAtom,
+	targetWidthAtom,
 } from "./states.ts";
 
 const LosslessScreenshotTab = () => {

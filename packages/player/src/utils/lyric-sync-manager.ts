@@ -1,11 +1,15 @@
 import type { TTMLLyric } from "@applemusic-like-lyrics/lyric";
 import { parseTTML } from "@applemusic-like-lyrics/lyric";
+import { platform } from "@tauri-apps/plugin-os";
 import chalk from "chalk";
 import type { Store } from "jotai/vanilla/store";
 import JSZip from "jszip";
 import pLimit from "p-limit";
 import { db } from "../dexie";
-import { lyricDBVersionAtom } from "../states/appAtoms";
+import {
+	lyricDBIntegrityVersionAtom,
+	lyricDBVersionAtom,
+} from "../states/appAtoms";
 
 /**
  * 同步结果
@@ -59,6 +63,9 @@ interface IndexEntry {
 }
 
 const INCREMENTAL_THRESHOLD = 200;
+const ANDROID_INCREMENTAL_THRESHOLD = 80;
+const FULL_SYNC_PARSE_BATCH_SIZE = 24;
+const INCREMENTAL_PARSE_CONCURRENCY = 4;
 
 const TTML_LOG_TAG = chalk.bgHex("#FF5577").hex("#FFFFFF")(" TTML DB ");
 
@@ -71,6 +78,16 @@ const getMirrorIndexUrl = (): string => {
 const getMirrorLyricUrl = (fileName: string): string => {
 	return `${MIRROR_BASE}/raw-lyrics/${fileName}`;
 };
+
+const waitForIdle = () =>
+	new Promise<void>((resolve) => {
+		const ric = globalThis.requestIdleCallback;
+		if (ric) {
+			ric(() => resolve(), { timeout: 200 });
+			return;
+		}
+		setTimeout(resolve, 16);
+	});
 
 async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
 	for (let i = 0; i < retries; i++) {
@@ -123,13 +140,27 @@ export async function syncLyricsDatabase(store: Store): Promise<SyncResult> {
 				const remoteVersion: RemoteVersion = await versionRes.json();
 
 				const localCommit = store.get(lyricDBVersionAtom);
+				const localIntegrityCommit = store.get(lyricDBIntegrityVersionAtom);
+				const localCount = await db.ttmlDB.count();
+				console.log(
+					TTML_LOG_TAG,
+					`本地歌词库状态: count=${localCount}, version=${
+						localCommit?.slice(0, 7) || "None"
+					}, integrity=${localIntegrityCommit?.slice(0, 7) || "None"}, remote=${remoteVersion.commit.slice(0, 7)}, remoteCount=${remoteVersion.file_count}`,
+				);
 
 				if (localCommit === remoteVersion.commit) {
-					const count = await db.ttmlDB.count();
-					if (count > 0) {
+					if (
+						localCount === remoteVersion.file_count &&
+						localIntegrityCommit === remoteVersion.commit
+					) {
 						console.log(TTML_LOG_TAG, "歌词库已是最新，无需更新。");
 						return { status: SyncStatus.Skipped };
 					}
+					console.warn(
+						TTML_LOG_TAG,
+						`本地歌词库需要完整性校验 (${localCount}/${remoteVersion.file_count})，重新同步。`,
+					);
 				}
 
 				console.log(
@@ -137,17 +168,16 @@ export async function syncLyricsDatabase(store: Store): Promise<SyncResult> {
 					`检测到新版本 (Local: ${localCommit?.slice(0, 7) || "None"} -> Remote: ${remoteVersion.commit.slice(0, 7)})，开始下载...`,
 				);
 
-				const localCount = await db.ttmlDB.count();
 				let result: SyncResult;
 
 				if (localCount === 0) {
-					result = await performFullSync(store, remoteVersion.commit);
+					result = await performFullSync(store, remoteVersion);
 				} else {
 					try {
-						result = await performIncrementalSync(store, remoteVersion.commit);
+						result = await performIncrementalSync(store, remoteVersion);
 					} catch (err) {
 						console.warn(TTML_LOG_TAG, "增量更新失败:", err);
-						result = await performFullSync(store, remoteVersion.commit);
+						result = await performFullSync(store, remoteVersion);
 					}
 				}
 
@@ -162,24 +192,28 @@ export async function syncLyricsDatabase(store: Store): Promise<SyncResult> {
 
 async function performFullSync(
 	store: Store,
-	commit: string,
+	remoteVersion: RemoteVersion,
 ): Promise<SyncResult> {
 	const zipUrl = `${MIRROR_BASE}/raw-lyrics/raw-lyrics.zip`;
 
 	const res = await fetch(zipUrl);
 	if (!res.ok) throw new Error(`下载zip失败: ${res.status}`);
 
-	const zipBlob = await res.blob();
-	const zip = await JSZip.loadAsync(zipBlob);
+	const zipData = await res.arrayBuffer();
+	const zip = await JSZip.loadAsync(zipData);
+
+	const lyricEntries: { relativePath: string; entry: JSZip.JSZipObject }[] = [];
+	zip.forEach((relativePath, entry) => {
+		if (entry.dir || !relativePath.endsWith(".ttml")) return;
+		lyricEntries.push({ relativePath, entry });
+	});
 
 	const lyricsToInsert: { name: string; content: TTMLLyric; raw: string }[] =
 		[];
-	const promises: Promise<void>[] = [];
-
-	zip.forEach((relativePath, entry) => {
-		if (entry.dir || !relativePath.endsWith(".ttml")) return;
-		promises.push(
-			(async () => {
+	for (let i = 0; i < lyricEntries.length; i += FULL_SYNC_PARSE_BATCH_SIZE) {
+		const batch = lyricEntries.slice(i, i + FULL_SYNC_PARSE_BATCH_SIZE);
+		await Promise.all(
+			batch.map(async ({ relativePath, entry }) => {
 				try {
 					const raw = await entry.async("string");
 					lyricsToInsert.push({
@@ -190,17 +224,24 @@ async function performFullSync(
 				} catch (e) {
 					console.warn(TTML_LOG_TAG, `解析歌词文件 ${relativePath} 失败:`, e);
 				}
-			})(),
+			}),
 		);
-	});
+		await waitForIdle();
+	}
 
-	await Promise.all(promises);
+	if (lyricsToInsert.length !== remoteVersion.file_count) {
+		throw new Error(
+			`全量同步条目数不完整 (${lyricsToInsert.length}/${remoteVersion.file_count})`,
+		);
+	}
 
 	if (lyricsToInsert.length > 0) {
 		await db.transaction("rw", db.ttmlDB, async () => {
+			await db.ttmlDB.clear();
 			await db.ttmlDB.bulkPut(lyricsToInsert);
 		});
-		store.set(lyricDBVersionAtom, commit);
+		store.set(lyricDBVersionAtom, remoteVersion.commit);
+		store.set(lyricDBIntegrityVersionAtom, remoteVersion.commit);
 		return {
 			status: SyncStatus.Updated,
 			count: lyricsToInsert.length,
@@ -213,7 +254,7 @@ async function performFullSync(
 
 async function performIncrementalSync(
 	store: Store,
-	remoteCommit: string,
+	remoteVersion: RemoteVersion,
 ): Promise<SyncResult> {
 	const indexUrl = getMirrorIndexUrl();
 	console.log(TTML_LOG_TAG, "下载索引:", indexUrl);
@@ -233,7 +274,7 @@ async function performIncrementalSync(
 	});
 
 	const localKeys = await db.ttmlDB.toCollection().keys();
-	const localFiles = new Set(localKeys);
+	const localFiles = new Set(localKeys.map(String));
 
 	const toDownload: string[] = [];
 	remoteFiles.forEach((file) => {
@@ -241,23 +282,34 @@ async function performIncrementalSync(
 			toDownload.push(file);
 		}
 	});
+	const toDelete: string[] = [];
+	localFiles.forEach((file) => {
+		if (!remoteFiles.has(file)) {
+			toDelete.push(file);
+		}
+	});
 
 	console.log(
 		TTML_LOG_TAG,
-		`需要下载 ${toDownload.length}, 远程有 ${remoteFiles.size}`,
+		`需要下载 ${toDownload.length}, 删除 ${toDelete.length}, 远程有 ${remoteFiles.size}`,
 	);
 
-	if (toDownload.length > INCREMENTAL_THRESHOLD) {
+	const incrementalThreshold =
+		platform() === "android"
+			? ANDROID_INCREMENTAL_THRESHOLD
+			: INCREMENTAL_THRESHOLD;
+	if (toDownload.length > incrementalThreshold) {
 		console.log(TTML_LOG_TAG, "转为全量下载", toDownload.length);
-		return performFullSync(store, remoteCommit);
+		return performFullSync(store, remoteVersion);
 	}
 
-	if (toDownload.length === 0) {
-		store.set(lyricDBVersionAtom, remoteCommit);
+	if (toDownload.length === 0 && toDelete.length === 0) {
+		store.set(lyricDBVersionAtom, remoteVersion.commit);
+		store.set(lyricDBIntegrityVersionAtom, remoteVersion.commit);
 		return { status: SyncStatus.Skipped, count: 0, strategy: "incremental" };
 	}
 
-	const limit = pLimit(20);
+	const limit = pLimit(INCREMENTAL_PARSE_CONCURRENCY);
 	const lyricsToInsert: { name: string; content: TTMLLyric; raw: string }[] =
 		[];
 	const errors: string[] = [];
@@ -283,16 +335,32 @@ async function performIncrementalSync(
 
 	await Promise.all(tasks);
 
-	if (lyricsToInsert.length > 0) {
+	if (lyricsToInsert.length > 0 || toDelete.length > 0) {
 		await db.transaction("rw", db.ttmlDB, async () => {
-			await db.ttmlDB.bulkPut(lyricsToInsert);
+			if (lyricsToInsert.length > 0) {
+				await db.ttmlDB.bulkPut(lyricsToInsert);
+			}
+			if (toDelete.length > 0) {
+				await db.ttmlDB.bulkDelete(toDelete);
+			}
 		});
+	}
 
-		store.set(lyricDBVersionAtom, remoteCommit);
+	if (errors.length > 0) {
+		throw new Error(
+			`增量同步未完整完成，失败 ${errors.length} 个文件: ${errors
+				.slice(0, 5)
+				.join(", ")}`,
+		);
+	}
+
+	if (lyricsToInsert.length > 0 || toDelete.length > 0) {
+		store.set(lyricDBVersionAtom, remoteVersion.commit);
+		store.set(lyricDBIntegrityVersionAtom, remoteVersion.commit);
 
 		console.log(
 			TTML_LOG_TAG,
-			`增量同步 ${lyricsToInsert.length}, 失败 ${errors.length}`,
+			`增量同步 ${lyricsToInsert.length}, 删除 ${toDelete.length}, 失败 ${errors.length}`,
 		);
 		return {
 			status: SyncStatus.Updated,

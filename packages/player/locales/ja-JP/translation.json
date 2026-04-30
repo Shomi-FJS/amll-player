@@ -83,9 +83,30 @@
 	"newPlaylist": {
 		"buttonLabel": "新プレイリストを作成する",
 		"dialog": {
-			"name": "歌单名称",
+			"name": "プレイリスト名",
 			"namePlaceholder": "プレイリスト名",
-			"title": "新プレイリストを作成する"
+			"title": "新プレイリストを作成する",
+			"folderScan": {
+				"dialogTitle": "スキャンする音楽フォルダーを選択",
+				"depthLabel": "スキャン範囲",
+				"depth": {
+					"recursive": "すべてのサブフォルダーを含む（推奨）",
+					"shallow": "選択したフォルダーのみスキャン"
+				},
+				"toast": {
+					"empty": "選択したフォルダーに音声ファイルが見つかりません",
+					"pickerFailed": "フォルダー選択を開けません：{error}",
+					"scanFailed": "フォルダーのスキャンに失敗：{error}",
+					"scanning": "フォルダー内の音声ファイルをスキャン中..."
+				}
+			},
+			"source": {
+				"androidFolderScan": "指定フォルダーをスキャンしてインデックス化（Android）",
+				"androidMedia": "Android Content Provider - 音声メディア（未実装）",
+				"local": "ローカル曲ソース"
+			},
+			"sourceLabel": "プレイリストソース",
+			"sourcePlaceholder": "プレイリストソース"
 		}
 	},
 	"page": {
@@ -152,7 +173,35 @@
 			},
 			"playAll": "播放全部",
 			"shufflePlayAll": "随机播放",
-			"totalMusicLabel": "{count, plural, other {#}} 首歌曲"
+			"totalMusicLabel": "{count, plural, other {#}} 首歌曲",
+			"addLocalMusicFolder": {
+				"dialogTitle": "音楽フォルダーを選択",
+				"label": "ローカルフォルダーを追加",
+				"toast": {
+					"empty": "選択したフォルダーに音声ファイルが見つかりません",
+					"scanFailed": "フォルダーのスキャンに失敗：{error}",
+					"scanning": "フォルダー内の音声ファイルをスキャン中..."
+				}
+			},
+			"folderScanRefresh": {
+				"label": "フォルダーを更新",
+				"link": "ローカルフォルダーにリンク",
+				"relink": "ローカルフォルダーを再リンク",
+				"unlink": "フォルダーのリンクを解除",
+				"depthDialog": {
+					"title": "スキャン範囲を選択",
+					"description": "今回のスキャンでサブフォルダーまで降りるかを選択します。"
+				},
+				"toast": {
+					"canceling": "キャンセル中...",
+					"empty": "このフォルダー内に音声ファイルが見つかりません",
+					"linked": "フォルダーをリンクしました。スキャンを開始...",
+					"scanCanceled": "スキャンをキャンセルしました",
+					"scanFailed": "再スキャンに失敗：{error}",
+					"scanning": "フォルダーを再スキャン中...",
+					"unlinked": "このプレイリストとフォルダーのリンクを解除しました"
+				}
+			}
 		},
 		"search": {
 			"filter": {
@@ -407,13 +456,15 @@
 				"importFromFile": "从本地文件导入歌词",
 				"lyricData": "歌词数据",
 				"lyricFormat": {
-					"eslrc": "ESLyRiC 歌词",
-					"lrc": "LyRiC 歌词",
-					"lys": "Lyricify Syllable 歌词",
-					"none": "无歌词",
-					"qrc": "QRC 歌词",
-					"ttml": "TTML 歌词",
-					"yrc": "YRC 歌词"
+					"eslrc": "ESLyRiC 歌詞",
+					"lrc": "LyRiC 歌詞",
+					"lrcA2": "LRC A2（拡張 LRC）",
+					"lyl": "Lyricify Lines",
+					"lys": "Lyricify Syllable 歌詞",
+					"none": "歌詞なし",
+					"qrc": "QRC 歌詞",
+					"ttml": "TTML 歌詞",
+					"yrc": "YRC 歌詞"
 				},
 				"lyricFormatLabel": "歌词格式",
 				"romanLyricDataTip": "请提供 LyRiC 格式的歌词数据，将会根据时间戳与一致或靠近的原文歌词配对成为音译",

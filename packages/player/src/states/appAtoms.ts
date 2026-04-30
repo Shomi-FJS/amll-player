@@ -40,6 +40,13 @@ export const lyricDBVersionAtom = atomWithStorage<string | null>(
 	{ getOnInit: true },
 );
 
+export const lyricDBIntegrityVersionAtom = atomWithStorage<string | null>(
+	"amll-player.lyricDBIntegrityVersion",
+	null,
+	undefined,
+	{ getOnInit: true },
+);
+
 export const advanceLyricDynamicLyricTimeAtom = atomWithStorage(
 	"amll-player.advanceLyricDynamicLyricTimeAtom",
 	false,
@@ -82,6 +89,11 @@ export const wsProtocolListenAddrAtom = atomWithStorage(
 
 export const showStatJSFrameAtom = atomWithStorage(
 	"amll-player.showStatJSFrame",
+	false,
+);
+
+export const enableDebugModeAtom = atomWithStorage(
+	"amll-player.enableDebugMode",
 	false,
 );
 

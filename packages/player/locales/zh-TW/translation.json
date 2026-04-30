@@ -83,9 +83,30 @@
 	"newPlaylist": {
 		"buttonLabel": "新建播放清單",
 		"dialog": {
-			"name": "歌单名称",
+			"name": "歌單名稱",
 			"namePlaceholder": "歌單名稱",
-			"title": "新建歌單"
+			"title": "新建歌單",
+			"folderScan": {
+				"dialogTitle": "選擇要掃描的音樂資料夾",
+				"depthLabel": "掃描範圍",
+				"depth": {
+					"recursive": "包含所有子資料夾（推薦）",
+					"shallow": "僅掃描所選資料夾當前層級"
+				},
+				"toast": {
+					"empty": "未在所選資料夾中找到任何音訊檔案",
+					"pickerFailed": "無法開啟資料夾選擇器：{error}",
+					"scanFailed": "掃描資料夾失敗：{error}",
+					"scanning": "正在掃描資料夾中的音訊檔案..."
+				}
+			},
+			"source": {
+				"androidFolderScan": "掃描指定資料夾建立索引（Android）",
+				"androidMedia": "Android 內容提供者 - 音訊媒體來源（尚未實作）",
+				"local": "本機歌曲來源"
+			},
+			"sourceLabel": "歌單管理來源",
+			"sourcePlaceholder": "歌單管理來源"
 		}
 	},
 	"page": {
@@ -152,7 +173,35 @@
 			},
 			"playAll": "播放全部",
 			"shufflePlayAll": "隨機播放",
-			"totalMusicLabel": "{count, plural, other {#}} 首歌曲"
+			"totalMusicLabel": "{count, plural, other {#}} 首歌曲",
+			"addLocalMusicFolder": {
+				"dialogTitle": "選擇音樂資料夾",
+				"label": "新增本機資料夾",
+				"toast": {
+					"empty": "未在所選資料夾中找到任何音訊檔案",
+					"scanFailed": "掃描資料夾失敗：{error}",
+					"scanning": "正在掃描資料夾中的音訊檔案..."
+				}
+			},
+			"folderScanRefresh": {
+				"label": "重新整理資料夾",
+				"link": "關聯到本機資料夾",
+				"relink": "重新關聯本機資料夾",
+				"unlink": "解除資料夾關聯",
+				"depthDialog": {
+					"title": "選擇掃描範圍",
+					"description": "決定本次掃描是否要進入所選目錄下的子資料夾。"
+				},
+				"toast": {
+					"canceling": "正在取消...",
+					"empty": "該資料夾下未找到任何音訊檔案",
+					"linked": "已關聯本機資料夾，開始掃描...",
+					"scanCanceled": "已取消掃描",
+					"scanFailed": "重新掃描失敗：{error}",
+					"scanning": "正在重新掃描資料夾...",
+					"unlinked": "已解除該歌單的資料夾關聯"
+				}
+			}
 		},
 		"search": {
 			"filter": {
@@ -409,6 +458,8 @@
 				"lyricFormat": {
 					"eslrc": "ESLyRiC 歌詞",
 					"lrc": "LyRiC 歌詞",
+					"lrcA2": "LRC A2（增強 LRC）",
+					"lyl": "Lyricify Lines",
 					"lys": "Lyricify Syllable 歌詞",
 					"none": "無歌詞",
 					"qrc": "QRC 歌詞",

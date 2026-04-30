@@ -1,6 +1,7 @@
 .body {
 	height: 100vh;
 	overflow: hidden;
+	contain: layout paint;
 }
 
 .radixTheme,
@@ -32,6 +33,7 @@
 
 .body::after {
 	transition: opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+	will-change: opacity;
 	content: "";
 	display: block;
 	position: fixed;

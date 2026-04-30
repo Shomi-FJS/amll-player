@@ -60,7 +60,7 @@ import {
 export const FFTToLowPassContext: FC = () => {
 	const store = useStore();
 	const fftDataRange = useAtomValue(fftDataRangeAtom);
-	// const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
+	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
 
 	useEffect(() => {
 		emitAudioThread("setFFTRange", {
@@ -70,7 +70,7 @@ export const FFTToLowPassContext: FC = () => {
 	}, [fftDataRange]);
 
 	useEffect(() => {
-		// if (!isLyricPageOpened) return;
+		if (!isLyricPageOpened) return;
 		let rafId: number;
 		let curValue = 1;
 		let lt = 0;
@@ -134,8 +134,7 @@ export const FFTToLowPassContext: FC = () => {
 		return () => {
 			cancelAnimationFrame(rafId);
 		};
-	}, [store]);
-	// }, [store, isLyricPageOpened]);
+	}, [store, isLyricPageOpened]);
 
 	return null;
 };
@@ -201,15 +200,15 @@ const LyricContext: FC = () => {
 						`歌词库更新完成，新增 ${result.count} 个歌词`,
 					);
 					break;
-				// case SyncStatus.Skipped:
-				// 	console.log(LYRIC_LOG_TAG, "歌词库已是最新");
-				// 	break;
-				// case SyncStatus.Failed:
-				// 	console.warn(LYRIC_LOG_TAG, "歌词库同步失败", result.error);
-				// 	break;
-				// case SyncStatus.Empty:
-				// 	console.log(LYRIC_LOG_TAG, "远程歌词库为空");
-				// 	break;
+				case SyncStatus.Skipped:
+					console.log(LYRIC_LOG_TAG, "歌词库已是最新");
+					break;
+				case SyncStatus.Failed:
+					console.warn(LYRIC_LOG_TAG, "歌词库同步失败", result.error);
+					break;
+				case SyncStatus.Empty:
+					console.log(LYRIC_LOG_TAG, "远程歌词库为空");
+					break;
 			}
 		});
 	}, []);
@@ -295,11 +294,17 @@ export const LocalMusicContext: FC = () => {
 				if (oldUrl?.startsWith("blob:")) {
 					URL.revokeObjectURL(oldUrl);
 				}
-				const imgUrl = URL.createObjectURL(songFromDb.cover);
+				const transparentCover =
+					"data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+				const imgUrl =
+					songFromDb.cover.size > 0
+						? URL.createObjectURL(songFromDb.cover)
+						: transparentCover;
 				store.set(musicCoverAtom, imgUrl);
 				store.set(
 					musicCoverIsVideoAtom,
-					songFromDb.cover.type.startsWith("video"),
+					songFromDb.cover.size > 0 &&
+						songFromDb.cover.type.startsWith("video"),
 				);
 			} else {
 				store.set(musicNameAtom, data.musicInfo.name);
@@ -348,6 +353,7 @@ export const LocalMusicContext: FC = () => {
 
 	useEffect(() => {
 		let rafId: number;
+		let lastPublishedPosition = -1;
 
 		const updateLoop = () => {
 			const isPlaying = store.get(musicPlayingAtom);
@@ -358,10 +364,15 @@ export const LocalMusicContext: FC = () => {
 
 				const duration = store.get(musicDurationAtom) / 1000;
 				const clampedPos = Math.min(newPos, duration || 0);
+				const nextPosition = (clampedPos * 1000) | 0;
 
-				store.set(musicPlayingPositionAtom, (clampedPos * 1000) | 0);
+				if (Math.abs(nextPosition - lastPublishedPosition) >= 32) {
+					lastPublishedPosition = nextPosition;
+					store.set(musicPlayingPositionAtom, nextPosition);
+				}
 			} else {
 				lastSyncRef.current.timestamp = performance.now();
+				lastPublishedPosition = store.get(musicPlayingPositionAtom);
 			}
 			rafId = requestAnimationFrame(updateLoop);
 		};

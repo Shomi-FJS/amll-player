@@ -38,11 +38,14 @@ import {
 	VerticalCoverLayout,
 	verticalCoverLayoutAtom,
 } from "@applemusic-like-lyrics/react-full";
+import { HamburgerMenuIcon, PlusIcon } from "@radix-ui/react-icons";
 import {
 	Box,
 	Button,
 	Card,
+	DropdownMenu,
 	Flex,
+	IconButton,
 	Select,
 	Separator,
 	Slider,
@@ -56,6 +59,7 @@ import {
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
+import type { TFunction } from "i18next";
 import { atom, useAtom, useAtomValue, type WritableAtom } from "jotai";
 import { loadable } from "jotai/utils";
 import React, {
@@ -78,6 +82,7 @@ import {
 	DarkMode,
 	darkModeAtom,
 	enableAlwaysOnTopAtom,
+	enableDebugModeAtom,
 	enableMediaControlsAtom,
 	enableTaskbarLyricAtom,
 	showStatJSFrameAtom,
@@ -86,6 +91,13 @@ import {
 	taskbarLyricThemeSettingAtom,
 	updateInfoAtom,
 } from "../../states/appAtoms.ts";
+import {
+	type CustomLyricResponseFormat,
+	DEFAULT_LYRIC_SOURCES,
+	type LyricSourceConfig,
+	lyricSourcesAtom,
+	normalizeLyricSources,
+} from "../../utils/lyricSources.ts";
 import { restartApp } from "../../utils/player.ts";
 import styles from "./index.module.css";
 
@@ -152,8 +164,13 @@ const LyricFontSetting: FC = () => {
 	const [fontFamily, setFontFamily] = useAtom(lyricFontFamilyAtom);
 	const [fontWeight, setFontWeight] = useAtom(lyricFontWeightAtom);
 	const [letterSpacing, setLetterSpacing] = useAtom(lyricLetterSpacingAtom);
-	const [preview, setPreview] = useState("字体预览 Font Preview");
 	const { t } = useTranslation();
+	const [preview, setPreview] = useState(() =>
+		t(
+			"page.settings.lyricFont.fontPreview.defaultText",
+			"字体预览 Font Preview",
+		),
+	);
 
 	useLayoutEffect(() => {
 		setPreview(
@@ -1115,6 +1132,221 @@ const LyricBackgroundSettings = () => {
 	);
 };
 
+const createCustomLyricSource = (defaultName: string): LyricSourceConfig => ({
+	id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+	type: "custom",
+	name: defaultName,
+	enabled: true,
+	url: "",
+	format: "auto",
+});
+
+const getLyricSourceDisplayName = (
+	source: LyricSourceConfig,
+	t: TFunction,
+): string => {
+	switch (source.type) {
+		case "local":
+			return t("page.settings.lyricSources.builtin.local.name", "本地歌词");
+		case "amlldb":
+			return t("page.settings.lyricSources.builtin.amlldb.name", "AMLLDB");
+		case "custom":
+			return source.name;
+	}
+};
+
+const getLyricSourceDescription = (
+	source: LyricSourceConfig,
+	t: TFunction,
+): string => {
+	switch (source.type) {
+		case "local":
+			return t(
+				"page.settings.lyricSources.builtin.local.description",
+				"扫描本地同目录/子目录的 ttml、lrc、yrc 等歌词文件",
+			);
+		case "amlldb":
+			return t(
+				"page.settings.lyricSources.builtin.amlldb.description",
+				"按歌曲元数据从已同步的 AMLL TTML DB 中匹配",
+			);
+		case "custom":
+			return t(
+				"page.settings.lyricSources.custom.description",
+				"通过 URL 模板请求歌词，支持 {songName}、{songArtists}、{songAlbum} 占位符",
+			);
+	}
+};
+
+const LyricSourcesSettings: FC = () => {
+	const { t } = useTranslation();
+	const [sources, setSources] = useAtom(lyricSourcesAtom);
+	const normalizedSources = useMemo(
+		() => normalizeLyricSources(sources),
+		[sources],
+	);
+
+	const updateSources = (next: LyricSourceConfig[]) => {
+		setSources(normalizeLyricSources(next));
+	};
+
+	const updateSource = (id: string, patch: Partial<LyricSourceConfig>) => {
+		updateSources(
+			normalizedSources.map((source) =>
+				source.id === id ? { ...source, ...patch } : source,
+			),
+		);
+	};
+
+	const moveSource = (id: string, direction: -1 | 1) => {
+		const next = [...normalizedSources];
+		const index = next.findIndex((source) => source.id === id);
+		const target = index + direction;
+		if (index < 0 || target < 0 || target >= next.length) return;
+		[next[index], next[target]] = [next[target], next[index]];
+		updateSources(next);
+	};
+
+	const deleteSource = (id: string) => {
+		if (DEFAULT_LYRIC_SOURCES.some((source) => source.id === id)) return;
+		updateSources(normalizedSources.filter((source) => source.id !== id));
+	};
+
+	return (
+		<>
+			<SubTitle>{t("page.settings.lyricSources.subtitle", "歌词库")}</SubTitle>
+			<Text as="div" color="gray" size="2" mb="3">
+				{t(
+					"page.settings.lyricSources.description",
+					"导入本地音乐时会按下面顺序尝试歌词源，失败后自动退回到下一个。",
+				)}
+			</Text>
+			<Flex direction="column" gap="2">
+				{normalizedSources.map((source, index) => (
+					<Card key={source.id}>
+						<Flex direction="column" gap="3">
+							<Flex align="center" gap="3" wrap="wrap">
+								<Text weight="bold" style={{ minWidth: "2em" }}>
+									{index + 1}
+								</Text>
+								<Switch
+									checked={source.enabled}
+									onCheckedChange={(enabled) =>
+										updateSource(source.id, { enabled })
+									}
+								/>
+								<Flex direction="column" flexGrow="1" style={{ minWidth: 180 }}>
+									{source.type === "custom" ? (
+										<TextField.Root
+											value={source.name}
+											onChange={(event) =>
+												updateSource(source.id, {
+													name: event.currentTarget.value,
+												})
+											}
+										/>
+									) : (
+										<Text>{getLyricSourceDisplayName(source, t)}</Text>
+									)}
+									<Text size="2" color="gray">
+										{getLyricSourceDescription(source, t)}
+									</Text>
+								</Flex>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										<IconButton variant="ghost">
+											<HamburgerMenuIcon />
+										</IconButton>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content>
+										<DropdownMenu.Item
+											disabled={index === 0}
+											onClick={() => moveSource(source.id, -1)}
+										>
+											{t("page.settings.lyricSources.moveUp", "上移")}
+										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											disabled={index === normalizedSources.length - 1}
+											onClick={() => moveSource(source.id, 1)}
+										>
+											{t("page.settings.lyricSources.moveDown", "下移")}
+										</DropdownMenu.Item>
+										{source.type === "custom" && (
+											<>
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item
+													color="red"
+													onClick={() => deleteSource(source.id)}
+												>
+													{t("page.settings.lyricSources.delete", "删除")}
+												</DropdownMenu.Item>
+											</>
+										)}
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							</Flex>
+							{source.type === "custom" && (
+								<Flex direction="column" gap="2">
+									<TextField.Root
+										placeholder="https://example.com/lyric?name={songName}&artist={songArtists}"
+										value={source.url ?? ""}
+										onChange={(event) =>
+											updateSource(source.id, {
+												url: event.currentTarget.value,
+											})
+										}
+									/>
+									<Select.Root
+										value={source.format ?? "auto"}
+										onValueChange={(format) =>
+											updateSource(source.id, {
+												format: format as CustomLyricResponseFormat,
+											})
+										}
+									>
+										<Select.Trigger />
+										<Select.Content>
+											<Select.Item value="auto">
+												{t(
+													"page.settings.lyricSources.format.auto",
+													"自动识别格式",
+												)}
+											</Select.Item>
+											<Select.Item value="lrc">LRC</Select.Item>
+											<Select.Item value="eslrc">ESLrc</Select.Item>
+											<Select.Item value="lrcA2">LRC A2</Select.Item>
+											<Select.Item value="yrc">YRC</Select.Item>
+											<Select.Item value="qrc">QRC</Select.Item>
+											<Select.Item value="lys">LYS</Select.Item>
+											<Select.Item value="lyl">LYL</Select.Item>
+											<Select.Item value="ttml">TTML</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</Flex>
+							)}
+						</Flex>
+					</Card>
+				))}
+			</Flex>
+			<Button
+				mt="3"
+				variant="soft"
+				onClick={() =>
+					updateSources([
+						...normalizedSources,
+						createCustomLyricSource(
+							t("page.settings.lyricSources.customDefaultName", "自定义歌词源"),
+						),
+					])
+				}
+			>
+				<PlusIcon />
+				{t("page.settings.lyricSources.addCustom", "新增歌词源")}
+			</Button>
+		</>
+	);
+};
+
 const OthersSettings = () => {
 	const { t } = useTranslation();
 	return (
@@ -1132,6 +1364,14 @@ const OthersSettings = () => {
 					"可以看到帧率、帧时间、内存占用（仅 Chromuim 系）等信息，对性能影响较小。",
 				)}
 				configAtom={showStatJSFrameAtom}
+			/>
+			<SwitchSettings
+				label={t("page.settings.others.enableDebugMode.label", "调试模式")}
+				description={t(
+					"page.settings.others.enableDebugMode.description",
+					"开启后会将调试信息输出到开发者控制台，关闭后不再输出这些调试信息。",
+				)}
+				configAtom={enableDebugModeAtom}
 			/>
 			<SwitchSettings
 				label={t(
@@ -1396,6 +1636,8 @@ export const PlayerSettingsTab: FC<{ category: string }> = ({ category }) => {
 			return <GeneralSettings />;
 		case "lyricContent":
 			return <LyricContentSettings />;
+		case "lyricSources":
+			return <LyricSourcesSettings />;
 		case "lyricAppearance":
 			return <LyricAppearanceSettings />;
 		case "musicInfoAppearance":

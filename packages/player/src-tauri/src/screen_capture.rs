@@ -1,15 +1,16 @@
 use tauri::AppHandle;
+#[cfg(not(mobile))]
 use tauri::Manager;
 
 use anyhow_tauri::IntoTAResult;
 
 #[tauri::command]
 pub async fn take_screenshot(
-    app: AppHandle,
-    resize_window: bool,
-    target_width: u32,
-    target_height: u32,
-    recover_size: bool,
+    _app: AppHandle,
+    _resize_window: bool,
+    _target_width: u32,
+    _target_height: u32,
+    _recover_size: bool,
 ) -> anyhow_tauri::TAResult<String> {
     #[cfg(mobile)]
     {
@@ -17,6 +18,11 @@ pub async fn take_screenshot(
     }
     #[cfg(not(mobile))]
     {
+        let app = _app;
+        let resize_window = _resize_window;
+        let target_width = _target_width;
+        let target_height = _target_height;
+        let recover_size = _recover_size;
         let win = app.get_webview_window("main");
 
         let win = if let Some(win) = win {

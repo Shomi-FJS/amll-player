@@ -19,7 +19,6 @@
 	width: 1px;
 	height: 100%;
 	border-left: 1px solid var(--gray-6);
-	width: 4px;
 	box-sizing: border-box;
 	cursor: ew-resize;
 	transition: border-left 0.25s ease;

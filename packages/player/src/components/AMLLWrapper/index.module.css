@@ -5,6 +5,9 @@
 	width: 100vw;
 	height: 100vh;
 	isolation: isolate;
+	contain: layout paint size;
+	will-change: transform, border-radius;
+	backface-visibility: hidden;
 	transform-style: flat;
 	pointer-events: none;
 	background-color: #222;
@@ -12,6 +15,7 @@
 		border-radius 0.25s ease,
 		transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 	transform: translateY(100%);
+	translate: 0 0;
 	border-radius: 1em 1em 0 0;
 	overflow: hidden;
 	color: white;
@@ -22,6 +26,22 @@
 			border-radius 0.25s 0.25s ease,
 			transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 		transform: translateY(0%);
+		translate: 0 0;
 		border-radius: 0 0 0 0;
+	}
+}
+
+.returnToCoverArea {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: clamp(80px, 14vh, 180px);
+	z-index: 10;
+	cursor: pointer;
+	touch-action: manipulation;
+
+	@media screen and (orientation: landscape) {
+		display: none;
 	}
 }

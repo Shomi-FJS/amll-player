@@ -1,15 +1,15 @@
-import { Theme, Flex, Tabs } from "@radix-ui/themes";
+import { Flex, Tabs, Theme } from "@radix-ui/themes";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform, version } from "@tauri-apps/plugin-os";
+import { useAtomValue } from "jotai";
 import { StrictMode, useEffect, useState } from "react";
 import { ToastContainer } from "react-toastify";
 import semverGt from "semver/functions/gt";
 import styles from "./index.module.css";
-import { useAtomValue } from "jotai";
 import "@radix-ui/themes/styles.css";
+import { isDarkThemeAtom } from "../../states/appAtoms";
 import LosslessScreenshotTab from "./LosslessScreenshotTab";
 import RecordTab from "./RecordTab";
-import { isDarkThemeAtom } from "../../states/appAtoms";
 
 export const ScreenshotApp = () => {
 	const isDarkTheme = useAtomValue(isDarkThemeAtom);

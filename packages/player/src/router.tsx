@@ -1,7 +1,7 @@
 import {
-	Route,
 	createBrowserRouter,
 	createRoutesFromElements,
+	Route,
 } from "react-router-dom";
 import ErrorPage from "./pages/error/index.tsx";
 

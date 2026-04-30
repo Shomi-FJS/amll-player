@@ -2,6 +2,7 @@ import {
 	ArrowLeftIcon,
 	Component1Icon,
 	DesktopIcon,
+	FileTextIcon,
 	GearIcon,
 	HamburgerMenuIcon,
 	InfoCircledIcon,
@@ -99,6 +100,11 @@ const SidebarContent: FC<{ onNavigate: (pageId: string) => void }> = ({
 				id: "lyricContent",
 				label: t("page.settings.lyricContent.subtitle"),
 				icon: <TextAlignJustifyIcon width={20} height={20} />,
+			},
+			{
+				id: "lyricSources",
+				label: t("page.settings.lyricSources.subtitle", "歌词库"),
+				icon: <FileTextIcon width={20} height={20} />,
 			},
 			{
 				id: "lyricAppearance",

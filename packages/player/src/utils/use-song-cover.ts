@@ -1,16 +1,26 @@
 import { useLayoutEffect, useState } from "react";
-import { type Song, db } from "../dexie.ts";
+import { db, type Song } from "../dexie.ts";
 import { getVideoThumbnail } from "./video-thumbnail.ts";
 
 export const useSongCover = (song?: Song) => {
 	const [songImgUrl, setSongImgUrl] = useState<string>("");
 
 	useLayoutEffect(() => {
+		let canceled = false;
 		if (song?.cover) {
-			if (song.cover.type.startsWith("image") || song.cachedThumbnail) {
+			if (song.cover.type.startsWith("image") && song.cover.size > 0) {
 				const newUri = URL.createObjectURL(song.cachedThumbnail || song.cover);
 				setSongImgUrl(newUri);
 				return () => {
+					canceled = true;
+					URL.revokeObjectURL(newUri);
+				};
+			}
+			if (song.cachedThumbnail) {
+				const newUri = URL.createObjectURL(song.cachedThumbnail);
+				setSongImgUrl(newUri);
+				return () => {
+					canceled = true;
 					URL.revokeObjectURL(newUri);
 				};
 			}
@@ -20,10 +30,11 @@ export const useSongCover = (song?: Song) => {
 					db.songs.update(song.id, (newSong) => {
 						newSong.cachedThumbnail = blob;
 					});
-					setSongImgUrl(newUri);
+					if (!canceled) setSongImgUrl(newUri);
 					return newUri;
 				});
 				return () => {
+					canceled = true;
 					promise.then((uri) => {
 						URL.revokeObjectURL(uri);
 					});
@@ -31,6 +42,9 @@ export const useSongCover = (song?: Song) => {
 			}
 			setSongImgUrl("");
 		}
+		return () => {
+			canceled = true;
+		};
 	}, [song]);
 
 	return songImgUrl;

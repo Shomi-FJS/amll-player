@@ -11,6 +11,12 @@ import svgr from "vite-plugin-svgr";
 import wasm from "vite-plugin-wasm";
 
 const host = process.env.TAURI_DEV_HOST;
+const isAndroidBuild = process.env.TAURI_ENV_PLATFORM === "android";
+const androidBuildOptions = isAndroidBuild
+	? {
+			chunkSizeWarningLimit: 4096,
+		}
+	: {};
 
 function getCommitHash() {
 	try {
@@ -83,6 +89,7 @@ const GitMetadataPlugin = (): Plugin => {
 // https://vitejs.dev/config/
 export default defineConfig({
 	build: {
+		...androidBuildOptions,
 		rollupOptions: {
 			shimMissingExports: true,
 			input: {
