@@ -198,10 +198,9 @@ jobs:
         with:
           version: "v0.14.0"
 
-      - name: 构建 AMLL Player
+      - name: 安装 pnpm 依赖
         run: |
           pnpm i --frozen-lockfile --ignore-scripts
-          pnpm -F player tauri build
         env:
           AMLL_GITHUB_IS_ACTION: true
 
@@ -331,10 +330,9 @@ jobs:
             echo "$TARGET_ENV_VAR=$EXTRACT_DIR" >> $GITHUB_ENV
           done
 
-      - name: 构建 AMLL Player
+      - name: 安装 pnpm 依赖
         run: |
           pnpm i --frozen-lockfile --ignore-scripts
-          pnpm -F player tauri build
         env:
           AMLL_GITHUB_IS_ACTION: true
 
