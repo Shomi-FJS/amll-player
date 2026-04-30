@@ -4,13 +4,12 @@
 	"license": "GPL-3.0",
 	"devDependencies": {
 		"@biomejs/biome": "catalog:",
-		"lerna": "^9.0.7",
-		"nx": "^22.7.1",
-		"typescript": "catalog:"
+		"@typescript/native-preview": "7.0.0-dev.20260430.1"
 	},
 	"scripts": {
-		"build:libs": "nx run-many --target=build --projects=tag:library",
-		"format": "biome format . --write"
+		"format": "pnpm biome format . --write",
+		"typecheck": "pnpm tsgo -b",
+		"dev": "pnpm -F player tauri dev"
 	},
 	"packageManager": "pnpm@10.33.0",
 	"pnpm": {

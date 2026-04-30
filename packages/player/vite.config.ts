@@ -6,7 +6,6 @@ import jotaiReactRefresh from "jotai-babel/plugin-react-refresh";
 import { defineConfig, type Plugin } from "vite";
 import babel from "vite-plugin-babel";
 import i18nextLoader from "vite-plugin-i18next-loader";
-import lightningcss from "vite-plugin-lightningcss";
 import svgr from "vite-plugin-svgr";
 import wasm from "vite-plugin-wasm";
 
@@ -105,9 +104,6 @@ export default defineConfig({
 				ref: true,
 			},
 			include: ["./src/**/*.svg?react", "../react-full/src/**/*.svg?react"],
-		}),
-		lightningcss({
-			browserslist: "safari >= 10.13, chrome >= 91",
 		}),
 		GitMetadataPlugin(),
 		i18nextLoader({

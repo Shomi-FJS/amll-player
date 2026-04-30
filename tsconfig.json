@@ -1,12 +1,4 @@
 {
 	"files": [],
-	"references": [
-		{ "path": "packages/core" },
-		{ "path": "packages/docs" },
-		{ "path": "packages/player" },
-		{ "path": "packages/react" },
-		{ "path": "packages/react-full" },
-		{ "path": "packages/vue" },
-		{ "path": "packages/ttml" }
-	]
+	"references": [{ "path": "packages/player" }]
 }
