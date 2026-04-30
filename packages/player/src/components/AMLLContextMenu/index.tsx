@@ -13,7 +13,10 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import type { FC } from "react";
 import { Trans } from "react-i18next";
 import { router } from "../../router.tsx";
-import { enableAlwaysOnTopAtom, recordPanelOpenedAtom } from "../../states/appAtoms.ts";
+import {
+	enableAlwaysOnTopAtom,
+	recordPanelOpenedAtom,
+} from "../../states/appAtoms.ts";
 
 export const AMLLContextMenuContent: FC = () => {
 	const [hideLyricView, setHideLyricView] = useAtom(hideLyricViewAtom);

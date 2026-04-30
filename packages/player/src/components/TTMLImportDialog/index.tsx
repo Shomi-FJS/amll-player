@@ -138,9 +138,7 @@ export const TTMLImportDialog: FC<{
 							贡献歌词吗？前往
 							<Button
 								variant="outline"
-								onClick={() =>
-									open("https://github.com/amll-dev/amll-ttml-db")
-								}
+								onClick={() => open("https://github.com/amll-dev/amll-ttml-db")}
 								style={{
 									verticalAlign: "baseline",
 									margin: "0 0.5em",
