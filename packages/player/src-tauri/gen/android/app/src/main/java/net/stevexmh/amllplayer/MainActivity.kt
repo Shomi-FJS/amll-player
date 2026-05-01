@@ -21,7 +21,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
-    // SAF 目录选择器；结果通过 latch 回送给阻塞中的 JNI 线程
+    // 以字段初始化的方式注册 SAF 目录选择器。通过服毒AndroidX文档，这是官方推荐的书写姿势：不论 `super.onCreate()` 被怎么改动，它都会在 Activity 进入
+    // STARTED 状态之前完成注册，避免“必须在 onCreate 之前调用”报错。
     private val directoryPickerLauncher: ActivityResultLauncher<Uri?> =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             pendingDirectoryResult = uri?.toString()
@@ -30,19 +31,10 @@ class MainActivity : TauriActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 必须在 super.onCreate 前配置，否则首帧 inset 不生效
         setupImmersiveUi()
         super.onCreate(savedInstanceState)
-        // 暴露给 companion，供 Rust 通过 getInstance() 调用
         instance = this
 
-        // 进程被重建时，旧 launcher 已随旧 Activity 被销；latch 却可能还被 Rust
-        // 侧的 JNI 线程 await 着，永远等不到回调。此时主动让它返回 null。
-        pendingDirectoryLatch?.countDown()
-        pendingDirectoryLatch = null
-        pendingDirectoryResult = null
-
-        // 播放期间保持屏幕常亮
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
@@ -63,14 +55,19 @@ class MainActivity : TauriActivity() {
         @Volatile
         private var pendingDirectoryResult: String? = null
 
+        /**
+         * 唤起系统 SAF 目录选择器（`ACTION_OPEN_DOCUMENT_TREE`），并阻塞调用线程，直到用户选定目录或取消。
+         * **严禁在 UI 主线程调用**：选择器本身就跑在 UI 线程上，本函数会通过 [CountDownLatch] 阻塞等待返回，在 UI 线程调用会造成死锁。
+         * @return 用户选中的 tree URI（如 `content://...tree/...`）；用户取消或
+         *         Activity 不可用时返回 `null`。
+         */
         @JvmStatic
         fun getInstance(): MainActivity? = instance
 
-        // 由 Rust 通过 JNI 调用：在 UI 线程弹目录选择器，调用线程阻塞等回调
         @JvmStatic
         fun pickDirectoryTree(): String? {
             val activity = instance ?: return null
-            // 释放上一次未完成的等待，避免悬挂
+            // 万一上一次调用因异常遗留了没释放的 latch，这里先释放掉。
             pendingDirectoryLatch?.countDown()
             val latch = CountDownLatch(1)
             pendingDirectoryLatch = latch
@@ -79,14 +76,13 @@ class MainActivity : TauriActivity() {
                 try {
                     activity.directoryPickerLauncher.launch(null)
                 } catch (e: Throwable) {
-                    // launch 失败时立即解除阻塞
                     pendingDirectoryResult = null
                     latch.countDown()
                 }
             }
-            // 上限 5 分钟；足够用户完成选择，又能在 Activity 崩溃/切后台被
-            // 杀期间避免 Rust 侧 JNI 线程长时间挂起。
-            latch.await(5, TimeUnit.MINUTES)
+            // 设一个上限，以防选择器卡住时把工作线程永久挂起。
+            // 10 分钟已远远超过任何现实场景下用户选目录需要的时间。
+            latch.await(10, TimeUnit.MINUTES)
             return pendingDirectoryResult
         }
     }

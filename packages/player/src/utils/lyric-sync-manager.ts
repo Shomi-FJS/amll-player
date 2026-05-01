@@ -160,6 +160,17 @@ export async function syncLyricsDatabase(store: Store): Promise<SyncResult> {
 	);
 }
 
+// 每处理这么多 TTML 就让出一次主线程（setTimeout 0），避免 `parseTTML` 连续跑
+// 几千次把 JS 主线程独占数十秒——那会让同一时刻的 Tauri IPC 响应、用户点击
+// 全部卡住（Android WebView 上最明显）。50 是经验值：足够摊销 setTimeout 开销，
+// 又不会让单个批次跑超过 100ms。
+const PARSE_YIELD_BATCH = 50;
+
+// macrotask 让渡，比 Promise.resolve()（microtask）更彻底——后者不会真正
+// 让浏览器跑渲染/输入。
+const yieldToEventLoop = (): Promise<void> =>
+	new Promise((resolve) => setTimeout(resolve, 0));
+
 async function performFullSync(
 	store: Store,
 	commit: string,
@@ -174,27 +185,34 @@ async function performFullSync(
 
 	const lyricsToInsert: { name: string; content: TTMLLyric; raw: string }[] =
 		[];
-	const promises: Promise<void>[] = [];
 
+	const ttmlEntries: { path: string; entry: JSZip.JSZipObject }[] = [];
 	zip.forEach((relativePath, entry) => {
 		if (entry.dir || !relativePath.endsWith(".ttml")) return;
-		promises.push(
-			(async () => {
+		ttmlEntries.push({ path: relativePath, entry });
+	});
+
+	// 分批串行处理，每批内并发解压，批与批之间 setTimeout(0) 让渡事件循环
+	for (let i = 0; i < ttmlEntries.length; i += PARSE_YIELD_BATCH) {
+		const batch = ttmlEntries.slice(i, i + PARSE_YIELD_BATCH);
+		await Promise.all(
+			batch.map(async ({ path, entry }) => {
 				try {
 					const raw = await entry.async("string");
 					lyricsToInsert.push({
-						name: relativePath,
+						name: path,
 						content: parseTTML(raw),
 						raw: raw,
 					});
 				} catch (e) {
-					console.warn(TTML_LOG_TAG, `解析歌词文件 ${relativePath} 失败:`, e);
+					console.warn(TTML_LOG_TAG, `解析歌词文件 ${path} 失败:`, e);
 				}
-			})(),
+			}),
 		);
-	});
-
-	await Promise.all(promises);
+		if (i + PARSE_YIELD_BATCH < ttmlEntries.length) {
+			await yieldToEventLoop();
+		}
+	}
 
 	if (lyricsToInsert.length > 0) {
 		await db.transaction("rw", db.ttmlDB, async () => {

@@ -3,7 +3,7 @@ use std::{
     fs::File,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{Context, anyhow};
 use parking_lot::RwLock as ParkingLotRwLock;
-use rodio::{OutputStream, Sink, Source};
+use rodio::{OutputStream, OutputStreamBuilder, Sink, Source};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::{
@@ -51,6 +51,13 @@ pub struct AudioPlayer {
     fft_broadcast_task: Option<JoinHandle<()>>,
     target_channels: u16,
     target_sample_rate: u32,
+    /// 最近一次已播到的位置（秒 × 1000，毫秒整数），由进度任务更新。
+    /// `recreate_stream` 用它在重建完输出流后把曲目 seek 回原处。
+    current_position_millis: Arc<AtomicU64>,
+    /// 底层输出流可能已失效（典型场景：Android 焦点丢失后 Oboe 断流，
+    /// 桌面端音频设备被拔出/切换）。为 true 时下次 Play/PlayAudio/ResumeAudio
+    /// 会先自动重建再继续。各后端按需通过 `StreamMaybeDirty` 消息打标。
+    stream_dirty: Arc<AtomicBool>,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -129,6 +136,8 @@ impl AudioPlayer {
         let (play_pos_sx, mut play_pos_rx) =
             tokio::sync::mpsc::unbounded_channel::<(bool, Option<f64>)>();
         let media_state_manager_clone = media_state_manager.clone();
+        let current_position_millis = Arc::new(AtomicU64::new(0));
+        let position_writer = current_position_millis.clone();
 
         tasks.push(tokio::task::spawn(async move {
             let mut time_it = tokio::time::interval(Duration::from_secs(1));
@@ -146,6 +155,10 @@ impl AudioPlayer {
                             if let Some(new_base_time) = new_base_time_opt {
                                 base_time = new_base_time;
                                 local_current_pos = base_time;
+                                position_writer.store(
+                                    (local_current_pos * 1000.0) as u64,
+                                    Ordering::Relaxed,
+                                );
 
                                 let _ = emitter_pos
                                     .emit(AudioThreadEvent::PlayPosition {
@@ -179,6 +192,10 @@ impl AudioPlayer {
                                 };
 
                                 local_current_pos = (base_time + played_time).min(duration);
+                                position_writer.store(
+                                    (local_current_pos * 1000.0) as u64,
+                                    Ordering::Relaxed,
+                                );
 
                                 let _ = emitter_pos
                                     .emit(AudioThreadEvent::PlayPosition {
@@ -245,6 +262,8 @@ impl AudioPlayer {
             fft_broadcast_task,
             target_channels,
             target_sample_rate,
+            current_position_millis,
+            stream_dirty: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -364,10 +383,99 @@ impl AudioPlayer {
                     .send_anonymous(AudioThreadMessage::SeekAudio { position: pos })
                     .await
             }
+            MediaStateMessage::RecreateStream => {
+                // 重建流是需要持有 &mut self 的重活，直接在这里干，不走消息队列
+                if let Err(e) = self.recreate_stream().await {
+                    warn!("重建音频输出流失败: {e:?}");
+                }
+                Ok(())
+            }
+            MediaStateMessage::StreamMaybeDirty => {
+                // 只打标，真正的重建推迟到下一次 Play/Resume/PlayAudio 时做，
+                // 避免在还没拿回焦点时就反复尝试新建 Oboe 流。
+                self.stream_dirty.store(true, Ordering::Relaxed);
+                Ok(())
+            }
         };
         if let Err(e) = result {
             warn!("发送媒体状态消息失败: {e:?}");
         }
+    }
+
+    /// 仅替换 `stream_handle` 和 `sink`，不重载歌曲。
+    /// 用于紧接着就会调用 `start_playing_song(true)` 的路径（例如 `PlayAudio`），
+    /// 避免重复解码老歌浪费 CPU。
+    async fn recreate_stream_only(&mut self) -> anyhow::Result<()> {
+        info!("正在重建音频输出流（不重载歌曲）");
+        self.stream_dirty.store(false, Ordering::Relaxed);
+
+        self.sink.stop();
+        let new_stream = OutputStreamBuilder::open_default_stream()
+            .context("重建 OutputStream 失败")?;
+        self.stream_handle = new_stream;
+        self.sink = Arc::new(Sink::connect_new(self.stream_handle.mixer()));
+        self.sink.set_volume(self.volume as f32);
+        self.current_decoder_handle = None;
+        Ok(())
+    }
+
+    /// 重建底层 `OutputStream` 与 `Sink`，保留当前歌曲和播放位置。
+    ///
+    /// 典型触发场景：Android 焦点丢失/音频设备切换后 Oboe 流被断开；桌面端也
+    /// 可能在默认输出设备变更时遇到旧流失声。重建后当前曲目会以**暂停**状态
+    /// 重新就位（seek 回原位置），上层据 `PlayStatus` 决定是否再发 `Play`。
+    pub async fn recreate_stream(&mut self) -> anyhow::Result<()> {
+        info!("正在重建音频输出流");
+        self.stream_dirty.store(false, Ordering::Relaxed);
+
+        let saved_position_secs =
+            self.current_position_millis.load(Ordering::Relaxed) as f64 / 1000.0;
+        let saved_song = self.current_song.clone();
+
+        // 先停掉老的 sink，这样残余回调不会写到即将被丢弃的 mixer。
+        self.sink.stop();
+
+        // 让旧 OutputStream 先被 drop，再申请新的。
+        // 某些后端（Oboe、部分 WASAPI exclusive mode）对同一 app 同时打开
+        // 两个输出流会拒绝服务，所以顺序不能反。
+        let new_stream = OutputStreamBuilder::open_default_stream()
+            .context("重建 OutputStream 失败")?;
+        self.stream_handle = new_stream;
+
+        self.sink = Arc::new(Sink::connect_new(self.stream_handle.mixer()));
+        self.sink.set_volume(self.volume as f32);
+        self.sink.pause();
+        self.current_decoder_handle = None;
+
+        if let Some(song) = saved_song {
+            self.current_song = Some(song);
+            // 重新装载曲目（解码器 + 新 sink），内部会 append 并把 sink 置为播放态
+            self.start_playing_song(false).await?;
+            // 立即暂停：恢复播放由上层根据用户意图决定
+            self.sink.pause();
+            // 尽量恢复原播放位置
+            if saved_position_secs > 0.0
+                && let Some(handle) = &self.current_decoder_handle
+                && handle
+                    .seek(Duration::from_secs_f64(saved_position_secs))
+                    .is_ok()
+            {
+                if let Some(counter) = self.current_samples_counter.read().await.as_ref() {
+                    counter.store(0, Ordering::SeqCst);
+                }
+                let _ = self
+                    .play_pos_sx
+                    .send((false, Some(saved_position_secs)));
+            }
+            self.update_media_manager_playback_state(false).await?;
+            let _ = self
+                .emitter()
+                .emit(AudioThreadEvent::PlayStatus { is_playing: false })
+                .await;
+        }
+
+        info!("音频输出流已重建完毕，位置={saved_position_secs:.2}s");
+        Ok(())
     }
 
     pub async fn process_message(
@@ -378,6 +486,14 @@ impl AudioPlayer {
         if let Some(ref data) = msg.data {
             match data {
                 AudioThreadMessage::ResumeAudio => {
+                    // 脏标志由 backend 打上（例如 Android 音频焦点丢失、桌面端
+                    // 设备变更），表示底层流已经不可信。此时直接 sink.play()
+                    // 会静默失败，所以先重建再继续。desktop 上该分支常年为 false。
+                    if self.stream_dirty.load(Ordering::Relaxed)
+                        && let Err(e) = self.recreate_stream().await
+                    {
+                        warn!("ResumeAudio 前重建流失败: {e:?}");
+                    }
                     self.sink.play();
                     let _ = self.play_pos_sx.send((true, None));
                     self.update_media_manager_playback_state(true).await?;
@@ -438,6 +554,14 @@ impl AudioPlayer {
                     }
                 }
                 AudioThreadMessage::PlayAudio { song } => {
+                    // 切歌时如果流是脏的（如前端在 Android 焦点丢失期间点了别的歌），
+                    // 先替换 OutputStream 再走常规加载；否则 start_playing_song
+                    // 里新建的 sink 仍然接在一个死 mixer 上，照样没声。
+                    if self.stream_dirty.load(Ordering::Relaxed)
+                        && let Err(e) = self.recreate_stream_only().await
+                    {
+                        warn!("PlayAudio 前重建流失败: {e:?}");
+                    }
                     self.current_song = Some(song.clone());
                     self.start_playing_song(true).await?;
                 }

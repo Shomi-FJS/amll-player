@@ -28,6 +28,9 @@
 }
 -keep class net.stevexmh.amllplayer.MainActivity$Companion { *; }
 -keepclassmembers class net.stevexmh.amllplayer.MainActivity {
-    public static java.lang.String pickDirectoryTree();
-    public static net.stevexmh.amllplayer.MainActivity getInstance();
+    static <fields>;
+    androidx.activity.result.ActivityResultLauncher directoryPickerLauncher;
 }
+
+# Tauri/Wry 自身使用了反射加载 WebView 桥；保险起见保留全部 app 包类。
+-keep class net.stevexmh.amllplayer.** { *; }

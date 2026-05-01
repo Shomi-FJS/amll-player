@@ -193,25 +193,33 @@ const LyricContext: FC = () => {
 	const store = useStore();
 
 	useEffect(() => {
-		syncLyricsDatabase(store).then((result) => {
-			switch (result.status) {
-				case SyncStatus.Updated:
-					console.log(
-						LYRIC_LOG_TAG,
-						`歌词库更新完成，新增 ${result.count} 个歌词`,
-					);
-					break;
-				// case SyncStatus.Skipped:
-				// 	console.log(LYRIC_LOG_TAG, "歌词库已是最新");
-				// 	break;
-				// case SyncStatus.Failed:
-				// 	console.warn(LYRIC_LOG_TAG, "歌词库同步失败", result.error);
-				// 	break;
-				// case SyncStatus.Empty:
-				// 	console.log(LYRIC_LOG_TAG, "远程歌词库为空");
-				// 	break;
-			}
-		});
+		// 推迟歌词库同步：首次启动时需要下载 ~50MB zip 并同步解析几千个 TTML，
+		// 如果跟用户的「初次导入文件夹」撞车，`parseTTML` 会霸占 JS 主线程
+		// 几十秒，导致 Tauri IPC 的 Promise 回调全部排队——表现就是「扫描瞬间
+		// 完成但之后一直在等待」（Android 上尤其明显）。用 requestIdleCallback
+		// 让同步等到主线程闲下来再开工；timeout 兜底 10s 确保最终一定会跑。
+		const start = () => {
+			syncLyricsDatabase(store).then((result) => {
+				switch (result.status) {
+					case SyncStatus.Updated:
+						console.log(
+							LYRIC_LOG_TAG,
+							`歌词库更新完成，新增 ${result.count} 个歌词`,
+						);
+						break;
+				}
+			});
+		};
+		let handle: number | undefined;
+		if (typeof window.requestIdleCallback === "function") {
+			handle = window.requestIdleCallback(start, { timeout: 10_000 });
+			return () => {
+				if (handle !== undefined) window.cancelIdleCallback(handle);
+			};
+		}
+		// Safari / 老 WebView 没有 requestIdleCallback：延迟 3s 给导入等首屏交互让路
+		const timer = window.setTimeout(start, 3_000);
+		return () => window.clearTimeout(timer);
 	}, []);
 
 	const { lyricLines, hasLyrics, metadata } = useLyricParser(
