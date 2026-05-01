@@ -83,8 +83,26 @@
 	"newPlaylist": {
 		"buttonLabel": "Tạo danh sách phát mới.",
 		"dialog": {
-			"name": "歌单名称",
+			"folderScan": {
+				"dialogTitle": "Chọn thư mục nhạc cần quét",
+				"depth": {
+					"recursive": "Bao gồm tất cả thư mục con (khuyến nghị)",
+					"shallow": "Chỉ quét thư mục đã chọn"
+				},
+				"depthLabel": "Độ sâu quét",
+				"toast": {
+					"pickerFailed": "Không thể mở trình chọn thư mục: {error}"
+				}
+			},
+			"name": "Tên playlist",
 			"namePlaceholder": "Tên playlist",
+			"source": {
+				"androidFolderScan": "Quét thư mục để tạo chỉ mục (Android)",
+				"androidMedia": "Android content provider - phương tiện âm thanh (chưa triển khai)",
+				"local": "Nguồn nhạc cục bộ"
+			},
+			"sourceLabel": "Nguồn playlist",
+			"sourcePlaceholder": "Nguồn playlist",
 			"title": "Tạo playlist mới"
 		}
 	},
@@ -124,23 +142,50 @@
 		},
 		"playlist": {
 			"addLocalMusic": {
-				"allFiles": "所有文件",
+				"allFiles": "Tất cả tệp",
 				"dialog": {
-					"failedDescription": "以下 {count, plural, other {#}} 首歌曲添加失败：",
-					"failedTitle": "部分歌曲导入失败"
+					"failedDescription": "{count, plural, other {#}} bài hát sau đây không thêm được:",
+					"failedTitle": "Một số bài hát không nhập được"
 				},
+				"dialogTitle": "Chọn nhạc cục bộ",
 				"filterName": "Tệp âm thanh",
 				"label": "Thêm bài hát từ bộ nhớ",
 				"toast": {
 					"allFailed": "Thêm {errored, plural, other {#}} bài hát thất bại",
+					"canceled": "Đã huỷ nhập, đã thêm {count, plural, other {#}} bài hát",
+					"firstImportHint": "Đang khởi tạo lần nhập đầu tiên, vui lòng đợi...",
 					"parsingMusicMetadata": "Đang phân tích siêu dữ liệu âm nhạc để thêm bài hát ({current, plural, other {#}} / {total, plural, other {#}})",
 					"partiallyFailed": "Đã thêm {succeed, plural, other {#}} bài hát, trong đó {errored, plural, other {#}} bài hát thất bại khi thêm",
 					"success": "Đã thêm tất cả {count, plural, other {#}} bài hát"
 				}
 			},
+			"addLocalMusicFolder": {
+				"label": "Thêm thư mục cục bộ"
+			},
 			"cover": {
-				"changeCoverToAuto": "更换成自动封面",
-				"uploadCoverImage": "上传封面图片"
+				"changeCoverToAuto": "Dùng ảnh bìa tự động",
+				"uploadCoverImage": "Tải lên ảnh bìa"
+			},
+			"folderScanRefresh": {
+				"depthDialog": {
+					"description": "Quyết định xem lần quét này có vào các thư mục con của thư mục đã chọn hay không.",
+					"recursive": "Quét đệ quy thư mục con",
+					"shallow": "Chỉ quét thư mục hiện tại",
+					"title": "Chọn phạm vi quét"
+				},
+				"label": "Làm mới thư mục",
+				"link": "Liên kết với thư mục cục bộ",
+				"relink": "Liên kết lại với thư mục cục bộ",
+				"toast": {
+					"canceling": "Đang huỷ...",
+					"empty": "Không tìm thấy tệp âm thanh nào trong thư mục này",
+					"linked": "Đã liên kết thư mục, bắt đầu quét...",
+					"scanCanceled": "Đã huỷ quét",
+					"scanFailed": "Quét lại thất bại: {error}",
+					"scanning": "Đang quét lại thư mục...",
+					"unlinked": "Đã bỏ liên kết thư mục khỏi playlist này"
+				},
+				"unlink": "Bỏ liên kết thư mục"
 			},
 			"music": {
 				"dropdown": {

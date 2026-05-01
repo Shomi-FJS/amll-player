@@ -4,6 +4,7 @@ import {
 	Pencil1Icon,
 	PlayIcon,
 	PlusIcon,
+	UpdateIcon,
 } from "@radix-ui/react-icons";
 import {
 	Box,
@@ -13,17 +14,16 @@ import {
 	Flex,
 	Heading,
 	IconButton,
+	RadioGroup,
 	ScrollArea,
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { path } from "@tauri-apps/api";
 import { open } from "@tauri-apps/plugin-dialog";
 import { platform } from "@tauri-apps/plugin-os";
 import { useLiveQuery } from "dexie-react-hooks";
 import { motion, useMotionTemplate, useScroll } from "framer-motion";
 import { useSetAtom } from "jotai";
-import md5 from "md5";
 import { type FC, useCallback, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
@@ -32,16 +32,16 @@ import { ViewportList } from "react-viewport-list";
 import { PageContainer } from "../../components/PageContainer/index.tsx";
 import { PlaylistCover } from "../../components/PlaylistCover/index.tsx";
 import { PlaylistSongCard } from "../../components/PlaylistSongCard/index.tsx";
-import { db, type Song } from "../../dexie.ts";
+import { db } from "../../dexie.ts";
 import {
 	currentPlaylistAtom,
 	currentPlaylistMusicIndexAtom,
 } from "../../states/appAtoms.ts";
 import {
-	emitAudioThread,
-	readLocalMusicMetadata,
-	resolveContentUri,
-} from "../../utils/player.ts";
+	importAudioFilesToPlaylist,
+	scanFolderAndImportToPlaylist,
+} from "../../utils/importMusic.ts";
+import { emitAudioThread, pickDirectoryTreeUri } from "../../utils/player.ts";
 import styles from "./index.module.css";
 
 export type Loadable<Value> =
@@ -117,10 +117,48 @@ export const Component: FC = () => {
 	const [failedImports, setFailedImports] = useState<
 		{ path: string; error: string }[]
 	>([]);
+	const [refreshingFolder, setRefreshingFolder] = useState(false);
+	/** 弹窗问扫描深度：resolve(true|false|null)。 */
+	const [scanDepthAsk, setScanDepthAsk] = useState<{
+		defaultRecursive: boolean;
+		resolve: (recursive: boolean | null) => void;
+	} | null>(null);
+	const [scanDepthDraft, setScanDepthDraft] = useState(true);
+
+	const askScanDepth = useCallback(
+		(defaultRecursive: boolean) =>
+			new Promise<boolean | null>((resolve) => {
+				setScanDepthDraft(defaultRecursive);
+				setScanDepthAsk({ defaultRecursive, resolve });
+			}),
+		[],
+	);
+
+	const closeScanDepthAsk = useCallback(
+		(value: boolean | null) => {
+			scanDepthAsk?.resolve(value);
+			setScanDepthAsk(null);
+		},
+		[scanDepthAsk],
+	);
 
 	const setPlaylist = useSetAtom(currentPlaylistAtom);
 	const setPlayIndex = useSetAtom(currentPlaylistMusicIndexAtom);
 	const setPosition = useSetAtom(musicPlayingPositionAtom);
+
+	const importMusicPaths = useCallback(
+		async (results: string[]) => {
+			const { failedList } = await importAudioFilesToPlaylist({
+				playlistId: Number(param.id),
+				results,
+				t,
+			});
+			if (failedList.length > 0) {
+				setFailedImports(failedList);
+			}
+		},
+		[param.id, t],
+	);
 
 	const onAddLocalMusics = useCallback(async () => {
 		let filters = [
@@ -150,123 +188,104 @@ export const Component: FC = () => {
 		}
 		const results = await open({
 			multiple: true,
-			title: "选择本地音乐",
+			title: t("page.playlist.addLocalMusic.dialogTitle", "选择本地音乐"),
 			filters,
 		});
 		if (!results) return;
-		console.log(results);
-		const id = toast.loading(
+		await importMusicPaths(results);
+	}, [importMusicPaths, t]);
+
+	const onAddLocalMusicFolder = useCallback(async () => {
+		const treeUri = await pickDirectoryTreeUri();
+		if (!treeUri) return;
+		// 一次性导入：不改歌单偏好，默认沿用已存偏好。
+		const recursive = await askScanDepth(playlist?.folderScanRecursive ?? true);
+		if (recursive === null) return;
+		const result = await scanFolderAndImportToPlaylist({
+			playlistId: Number(param.id),
+			treeUri,
+			t,
+			recursive,
+		});
+		if (result.failedList.length > 0) {
+			setFailedImports(result.failedList);
+		}
+	}, [param.id, t, askScanDepth, playlist?.folderScanRecursive]);
+
+	/**
+	 * 文件夹扫描歌单的「刷新」入口：用建歌单时记下的 SAF tree URI 重新枚举
+	 * 目录下的音频文件，把新增 / 改名 / 元数据有变动的歌曲增量同步进当前
+	 * 歌单。当前实现只做「新增 + 元数据更新」，不会主动剔除被外部删掉的
+	 * 歌曲条目（避免误删用户额外添加的曲目），用户如有需要可在歌单里手
+	 * 动右键删除。
+	 */
+	const onRefreshFolderScan = useCallback(async () => {
+		const treeUri = playlist?.folderScanTreeUri;
+		if (!treeUri) return;
+		setRefreshingFolder(true);
+		try {
+			// 刷新走静默路径，直接沿用建歌单时保存的递归偏好；老歌单没存
+			// 这个字段时按 true 兜底，行为和升级前一致。
+			const result = await scanFolderAndImportToPlaylist({
+				playlistId: Number(param.id),
+				treeUri,
+				t,
+				recursive: playlist?.folderScanRecursive ?? true,
+			});
+			if (result.failedList.length > 0) {
+				setFailedImports(result.failedList);
+			}
+		} finally {
+			setRefreshingFolder(false);
+		}
+	}, [playlist?.folderScanTreeUri, playlist?.folderScanRecursive, param.id, t]);
+
+	/**
+	 * 给一个老歌单（或想换目录的歌单）补上 / 替换 `folderScanTreeUri`，
+	 * 并立刻执行一次刷新，把目录下的音频导入。导入失败不会回滚关联，
+	 * 这样下次还能重试刷新。
+	 */
+	const onLinkFolderScan = useCallback(async () => {
+		const treeUri = await pickDirectoryTreeUri();
+		if (!treeUri) return;
+		// 首次挂目录，写入偏好供后续刷新复用。
+		const recursive = await askScanDepth(playlist?.folderScanRecursive ?? true);
+		if (recursive === null) return;
+		// 「换源」语义：清空原来源残留的歌曲，避免旧目录条目和新目录混在一起。
+		await db.playlists.update(Number(param.id), (obj) => {
+			obj.folderScanTreeUri = treeUri;
+			obj.folderScanRecursive = recursive;
+			obj.songIds = [];
+		});
+		toast.success(
 			t(
-				"page.playlist.addLocalMusic.toast.parsingMusicMetadata",
-				"正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
-				{
-					current: 0,
-					total: results.length,
-				},
+				"page.playlist.folderScanRefresh.toast.linked",
+				"已关联本地文件夹，开始扫描...",
 			),
 		);
-		let current = 0;
-		let success = 0;
-		const currentFailedList: { path: string; error: string }[] = [];
-		const transformed = (
-			await Promise.all(
-				results.map(async (v) => {
-					let normalized = v;
-					console.log(v);
-					if (platform() === "android" || platform() === "ios") {
-						normalized = await resolveContentUri(v);
-					} else {
-						normalized = (await path.normalize(v)).replace(/\\/gi, "/");
-					}
-					try {
-						const pathMd5 = md5(normalized);
-						const musicInfo = await readLocalMusicMetadata(normalized);
-
-						const coverData = new Uint8Array(musicInfo.cover);
-						const coverBlob = new Blob([coverData], { type: "image" });
-
-						success += 1;
-						return {
-							id: pathMd5,
-							filePath: normalized,
-							songName: musicInfo.name,
-							songArtists: musicInfo.artist,
-							songAlbum: musicInfo.album,
-							lyricFormat: musicInfo.lyricFormat || "none",
-							lyric: musicInfo.lyric,
-							cover: coverBlob,
-							duration: musicInfo.duration,
-						} satisfies Song;
-					} catch (err) {
-						console.warn("解析歌曲元数据以添加歌曲失败", normalized, err);
-						currentFailedList.push({
-							path: normalized,
-							error: err instanceof Error ? err.message : String(err),
-						});
-						return null;
-					} finally {
-						current += 1;
-						toast.update(id, {
-							render: t(
-								"page.playlist.addLocalMusic.toast.parsingMusicMetadata",
-								"正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
-								{
-									current: 0,
-									total: results.length,
-								},
-							),
-							progress: current / results.length,
-						});
-					}
-				}),
-			)
-		).filter((v) => !!v);
-		await db.songs.bulkPut(transformed);
-		const shouldAddIds = transformed
-			.map((v) => v.id)
-			.filter((v) => !playlist?.songIds.includes(v))
-			.reverse();
-		await db.playlists.update(Number(param.id), (obj) => {
-			obj.songIds.unshift(...shouldAddIds);
+		const result = await scanFolderAndImportToPlaylist({
+			playlistId: Number(param.id),
+			treeUri,
+			t,
+			recursive,
 		});
-		toast.done(id);
-		if (currentFailedList.length > 0) {
-			setFailedImports(currentFailedList);
-
-			if (success > 0) {
-				toast.warn(
-					t(
-						"page.playlist.addLocalMusic.toast.partiallyFailed",
-						"已添加 {succeed, plural, other {#}} 首歌曲，其中 {errored, plural, other {#}} 首歌曲添加失败",
-						{
-							succeed: success,
-							errored: currentFailedList.length,
-						},
-					),
-				);
-			} else {
-				toast.error(
-					t(
-						"page.playlist.addLocalMusic.toast.allFailed",
-						"{errored, plural, other {#}} 首歌曲添加失败",
-						{
-							errored: currentFailedList.length,
-						},
-					),
-				);
-			}
-		} else if (success > 0) {
-			toast.success(
-				t(
-					"page.playlist.addLocalMusic.toast.success",
-					"已全部添加 {count, plural, other {#}} 首歌曲",
-					{
-						count: success,
-					},
-				),
-			);
+		if (result.failedList.length > 0) {
+			setFailedImports(result.failedList);
 		}
-	}, [playlist, param.id, t]);
+	}, [param.id, t, askScanDepth, playlist?.folderScanRecursive]);
+
+	const onUnlinkFolderScan = useCallback(async () => {
+		await db.playlists.update(Number(param.id), (obj) => {
+			obj.folderScanTreeUri = undefined;
+			obj.folderScanRecursive = undefined;
+		});
+		toast.info(
+			t(
+				"page.playlist.folderScanRefresh.toast.unlinked",
+				"已解除该歌单的文件夹关联",
+			),
+		);
+	}, [param.id, t]);
 
 	const onPlayList = useCallback(
 		async (songIndex = 0, shuffle = false) => {
@@ -383,6 +402,33 @@ export const Component: FC = () => {
 											上传封面图片
 										</Trans>
 									</ContextMenu.Item>
+									{platform() === "android" && (
+										<>
+											<ContextMenu.Separator />
+											<ContextMenu.Item onClick={onLinkFolderScan}>
+												{playlist?.folderScanTreeUri
+													? t(
+															"page.playlist.folderScanRefresh.relink",
+															"重新关联本地文件夹",
+														)
+													: t(
+															"page.playlist.folderScanRefresh.link",
+															"关联到本地文件夹",
+														)}
+											</ContextMenu.Item>
+											{playlist?.folderScanTreeUri && (
+												<ContextMenu.Item
+													color="red"
+													onClick={onUnlinkFolderScan}
+												>
+													{t(
+														"page.playlist.folderScanRefresh.unlink",
+														"解除文件夹关联",
+													)}
+												</ContextMenu.Item>
+											)}
+										</>
+									)}
 								</ContextMenu.Content>
 							</ContextMenu.Root>
 						</motion.div>
@@ -427,12 +473,39 @@ export const Component: FC = () => {
 											随机播放
 										</Trans>
 									</Button>
-									<Button variant="soft" onClick={onAddLocalMusics}>
-										<PlusIcon />
-										<Trans i18nKey="page.playlist.addLocalMusic.label">
-											添加本地歌曲
-										</Trans>
-									</Button>
+									{/*
+									  歌单源是「文件夹扫描索引」时，单首散文件导入不适用——
+									  它们下次刷新不会被剔除，混进来反而难管理。
+									  「添加本地文件夹」也仅在未链接时显示——已链接时如需换
+									  目录，请通过右键菜单的「重新关联本地文件夹」走，避免新旧
+									  目录混在一起且 folderScanTreeUri 与实际数据不一致。
+									*/}
+									{!playlist?.folderScanTreeUri && (
+										<Button variant="soft" onClick={onAddLocalMusics}>
+											<PlusIcon />
+											{t("page.playlist.addLocalMusic.label", "添加本地歌曲")}
+										</Button>
+									)}
+									{platform() === "android" && !playlist?.folderScanTreeUri && (
+										<Button variant="soft" onClick={onAddLocalMusicFolder}>
+											<PlusIcon />
+											{t(
+												"page.playlist.addLocalMusicFolder.label",
+												"添加本地文件夹",
+											)}
+										</Button>
+									)}
+									{playlist?.folderScanTreeUri && (
+										<Button
+											variant="soft"
+											onClick={onRefreshFolderScan}
+											loading={refreshingFolder}
+											disabled={refreshingFolder}
+										>
+											<UpdateIcon />
+											{t("page.playlist.folderScanRefresh.label", "刷新文件夹")}
+										</Button>
+									)}
 								</Flex>
 							</motion.div>
 						</Flex>
@@ -470,9 +543,32 @@ export const Component: FC = () => {
 									<IconButton onClick={() => onPlaylistDefault()}>
 										<PlayIcon />
 									</IconButton>
-									<IconButton variant="soft" onClick={onAddLocalMusics}>
-										<PlusIcon />
-									</IconButton>
+									{!playlist?.folderScanTreeUri && (
+										<IconButton
+											variant="soft"
+											onClick={onAddLocalMusics}
+											title={t(
+												"page.playlist.addLocalMusic.label",
+												"添加本地歌曲",
+											)}
+										>
+											<PlusIcon />
+										</IconButton>
+									)}
+									{playlist?.folderScanTreeUri && (
+										<IconButton
+											variant="soft"
+											onClick={onRefreshFolderScan}
+											loading={refreshingFolder}
+											disabled={refreshingFolder}
+											title={t(
+												"page.playlist.folderScanRefresh.label",
+												"刷新文件夹",
+											)}
+										>
+											<UpdateIcon />
+										</IconButton>
+									)}
 								</Flex>
 							</motion.div>
 						</Flex>
@@ -503,6 +599,57 @@ export const Component: FC = () => {
 					)}
 				</Box>
 			</Flex>
+
+			<Dialog.Root
+				open={!!scanDepthAsk}
+				onOpenChange={(open) => {
+					if (!open) closeScanDepthAsk(null);
+				}}
+			>
+				<Dialog.Content style={{ maxWidth: 420 }}>
+					<Dialog.Title>
+						{t(
+							"page.playlist.folderScanRefresh.depthDialog.title",
+							"选择扫描范围",
+						)}
+					</Dialog.Title>
+					<Dialog.Description size="2" mb="3" color="gray">
+						{t(
+							"page.playlist.folderScanRefresh.depthDialog.description",
+							"决定本次扫描是否要进入所选目录下的子文件夹。",
+						)}
+					</Dialog.Description>
+					<RadioGroup.Root
+						value={scanDepthDraft ? "recursive" : "shallow"}
+						onValueChange={(v) => setScanDepthDraft(v === "recursive")}
+					>
+						<RadioGroup.Item value="recursive">
+							{t(
+								"newPlaylist.dialog.folderScan.depth.recursive",
+								"包含所有子文件夹（推荐）",
+							)}
+						</RadioGroup.Item>
+						<RadioGroup.Item value="shallow">
+							{t(
+								"newPlaylist.dialog.folderScan.depth.shallow",
+								"仅扫描所选文件夹本层",
+							)}
+						</RadioGroup.Item>
+					</RadioGroup.Root>
+					<Flex gap="3" mt="4" justify="end">
+						<Button
+							variant="soft"
+							color="gray"
+							onClick={() => closeScanDepthAsk(null)}
+						>
+							<Trans i18nKey="common.dialog.cancel">取消</Trans>
+						</Button>
+						<Button onClick={() => closeScanDepthAsk(scanDepthDraft)}>
+							<Trans i18nKey="common.dialog.confirm">确认</Trans>
+						</Button>
+					</Flex>
+				</Dialog.Content>
+			</Dialog.Root>
 
 			<Dialog.Root
 				open={failedImports.length > 0}

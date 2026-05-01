@@ -83,8 +83,26 @@
 	"newPlaylist": {
 		"buttonLabel": "新建播放清單",
 		"dialog": {
-			"name": "歌单名称",
+			"folderScan": {
+				"dialogTitle": "選擇要掃描的音樂資料夾",
+				"depth": {
+					"recursive": "包含所有子資料夾（推薦）",
+					"shallow": "僅掃描所選資料夾"
+				},
+				"depthLabel": "掃描深度",
+				"toast": {
+					"pickerFailed": "無法開啟資料夾選擇器：{error}"
+				}
+			},
+			"name": "歌單名稱",
 			"namePlaceholder": "歌單名稱",
+			"source": {
+				"androidFolderScan": "掃描資料夾建立索引（Android）",
+				"androidMedia": "Android 內容提供者 - 音訊媒體（未實作）",
+				"local": "本地歌曲源"
+			},
+			"sourceLabel": "歌單管理源",
+			"sourcePlaceholder": "歌單管理源",
 			"title": "新建歌單"
 		}
 	},
@@ -129,18 +147,45 @@
 					"failedDescription": "以下 {count, plural, other {#}} 首歌曲添加失败：",
 					"failedTitle": "部分歌曲导入失败"
 				},
+				"dialogTitle": "選擇本地音樂",
 				"filterName": "音頻檔案",
 				"label": "添加本地歌曲",
 				"toast": {
 					"allFailed": "{errored, plural, other {#}} 首歌曲添加失敗",
+					"canceled": "已取消匯入，已添加 {count, plural, other {#}} 首歌曲",
+					"firstImportHint": "初始化匯入中，請耐心等候",
 					"parsingMusicMetadata": "正在解析音樂後設資料以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
 					"partiallyFailed": "已添加 {succeed, plural, other {#}} 首歌曲，其中 {errored, plural, other {#}} 首歌曲添加失敗",
 					"success": "已全部添加 {count, plural, other {#}} 首歌曲"
 				}
 			},
+			"addLocalMusicFolder": {
+				"label": "添加本地資料夾"
+			},
 			"cover": {
 				"changeCoverToAuto": "更換成自動封面",
 				"uploadCoverImage": "上傳封面圖片"
+			},
+			"folderScanRefresh": {
+				"depthDialog": {
+					"description": "決定本次掃描是否要進入所選目錄下的子資料夾。",
+					"recursive": "遞迴掃描子資料夾",
+					"shallow": "僅掃描目前資料夾",
+					"title": "選擇掃描範圍"
+				},
+				"label": "重新整理資料夾",
+				"link": "關聯到本地資料夾",
+				"relink": "重新關聯本地資料夾",
+				"toast": {
+					"canceling": "正在取消...",
+					"empty": "該資料夾下未找到任何音訊檔案",
+					"linked": "已關聯本地資料夾，開始掃描...",
+					"scanCanceled": "已取消掃描",
+					"scanFailed": "重新掃描失敗：{error}",
+					"scanning": "正在重新掃描資料夾...",
+					"unlinked": "已解除該歌單的資料夾關聯"
+				},
+				"unlink": "解除資料夾關聯"
 			},
 			"music": {
 				"dropdown": {

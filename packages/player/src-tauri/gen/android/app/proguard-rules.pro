@@ -14,8 +14,20 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# 保留 MainActivity 及其反射/JNI 调用的成员（SAF 目录选择桥接）。
+# Rust 侧通过 JNI 反射调用 pickDirectoryTree，R8 默认不知道，会被裁掉/改名。
+-keep class net.stevexmh.amllplayer.MainActivity {
+    public static java.lang.String pickDirectoryTree();
+    *;
+}
+-keep class net.stevexmh.amllplayer.MainActivity$Companion { *; }
+-keepclassmembers class net.stevexmh.amllplayer.MainActivity {
+    public static java.lang.String pickDirectoryTree();
+    public static net.stevexmh.amllplayer.MainActivity getInstance();
+}

@@ -10,6 +10,8 @@ export interface Playlist {
 	updateTime: number;
 	playTime: number;
 	songIds: string[];
+	folderScanTreeUri?: string;
+	folderScanRecursive?: boolean;
 }
 
 export interface Song {

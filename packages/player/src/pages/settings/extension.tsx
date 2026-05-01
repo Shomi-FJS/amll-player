@@ -13,7 +13,14 @@ import {
 import { path } from "@tauri-apps/api";
 import { BaseDirectory } from "@tauri-apps/api/path";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
-import { copyFile, mkdir, remove, rename } from "@tauri-apps/plugin-fs";
+import {
+	copyFile,
+	mkdir,
+	readFile,
+	remove,
+	rename,
+	writeFile,
+} from "@tauri-apps/plugin-fs";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
 import { atom, useAtomValue, useStore } from "jotai";
@@ -21,7 +28,7 @@ import type { FC } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { extensionDirAtom, extensionMetaAtom } from "../../states/extension.ts";
 import { ExtensionLoadResult } from "../../states/extensionsAtoms.ts";
-import { restartApp } from "../../utils/player.ts";
+import { queryContentDisplayName, restartApp } from "../../utils/player.ts";
 
 const requireRestartAtom = atom(false);
 
@@ -91,11 +98,42 @@ export const ExtensionTab: FC = () => {
 							baseDir: BaseDirectory.AppData,
 						});
 						for (const extensionFile of extensionFiles) {
-							const extensionName = await path.basename(extensionFile);
-							await copyFile(
-								extensionFile,
-								await path.join(extensionDir, extensionName),
-							);
+							const isContentUri =
+								platform() === "android" &&
+								extensionFile.startsWith("content://");
+							let extensionName: string;
+							if (isContentUri) {
+								const queried = await queryContentDisplayName(extensionFile);
+								let raw: string;
+								try {
+									raw =
+										queried ??
+										decodeURIComponent(
+											extensionFile.split("/").pop() ?? "extension.js",
+										);
+								} catch {
+									// decodeURIComponent 在遇到非法 % 序列时会抛错，回落到原值
+									raw = extensionFile.split("/").pop() ?? "extension.js";
+								}
+								// content:// 末段可能是 `primary:Music/x.js` 这类带分隔符的
+								// document id；直接拼到 extensionDir 会逃出目标目录。统一把
+								// 路径分隔符换成下划线，并兜底一个安全名。
+								extensionName =
+									raw
+										.split(/[\\/:]/)
+										.pop()
+										?.trim() || "extension.js";
+								if (!extensionName) extensionName = "extension.js";
+							} else {
+								extensionName = await path.basename(extensionFile);
+							}
+							const targetPath = await path.join(extensionDir, extensionName);
+							if (isContentUri) {
+								const bytes = await readFile(extensionFile);
+								await writeFile(targetPath, bytes);
+							} else {
+								await copyFile(extensionFile, targetPath);
+							}
 						}
 						store.set(extensionMetaAtom);
 					}}

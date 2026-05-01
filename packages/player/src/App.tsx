@@ -96,14 +96,17 @@ function App() {
 					<Suspense>
 						<AMLLWrapper />
 					</Suspense>
-					<ToastContainer
-						theme="dark"
-						position="bottom-right"
-						style={{
-							marginBottom: "150px",
-						}}
-					/>
 				</Theme>
+				{/* Radix Theme 是独立 stacking context；ToastContainer 必须放它外面 +
+				    超大 z-index，才能盖过通过 Portal 挂到 body 的 Dialog overlay。 */}
+				<ToastContainer
+					theme="dark"
+					position="bottom-right"
+					style={{
+						marginBottom: "150px",
+						zIndex: 2147483000,
+					}}
+				/>
 			</StrictMode>
 		</>
 	);

@@ -83,8 +83,26 @@
 	"newPlaylist": {
 		"buttonLabel": "新プレイリストを作成する",
 		"dialog": {
-			"name": "歌单名称",
+			"folderScan": {
+				"dialogTitle": "スキャンする音楽フォルダーを選択",
+				"depth": {
+					"recursive": "すべてのサブフォルダーを含む（推奨）",
+					"shallow": "選択したフォルダーのみスキャン"
+				},
+				"depthLabel": "スキャンの深さ",
+				"toast": {
+					"pickerFailed": "フォルダー選択ツールを開けませんでした：{error}"
+				}
+			},
+			"name": "プレイリスト名",
 			"namePlaceholder": "プレイリスト名",
+			"source": {
+				"androidFolderScan": "フォルダーをスキャンしてインデックスを作成（Android）",
+				"androidMedia": "Android コンテンツプロバイダー - オーディオメディア（未実装）",
+				"local": "ローカル曲ソース"
+			},
+			"sourceLabel": "プレイリストソース",
+			"sourcePlaceholder": "プレイリストソース",
 			"title": "新プレイリストを作成する"
 		}
 	},
@@ -124,23 +142,50 @@
 		},
 		"playlist": {
 			"addLocalMusic": {
-				"allFiles": "所有文件",
+				"allFiles": "すべてのファイル",
 				"dialog": {
-					"failedDescription": "以下 {count, plural, other {#}} 首歌曲添加失败：",
-					"failedTitle": "部分歌曲导入失败"
+					"failedDescription": "以下の {count, plural, other {#}} 曲の追加に失敗しました：",
+					"failedTitle": "一部の曲のインポートに失敗"
 				},
-				"filterName": "音频文件",
-				"label": "添加本地歌曲",
+				"dialogTitle": "ローカルミュージックを選択",
+				"filterName": "オーディオファイル",
+				"label": "ローカル曲を追加",
 				"toast": {
-					"allFailed": "{errored, plural, other {#}} 首歌曲添加失败",
-					"parsingMusicMetadata": "正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
-					"partiallyFailed": "已添加 {succeed, plural, other {#}} 首歌曲，其中 {errored, plural, other {#}} 首歌曲添加失败",
-					"success": "已全部添加 {count, plural, other {#}} 首歌曲"
+					"allFailed": "{errored, plural, other {#}} 曲の追加に失敗",
+					"canceled": "インポートをキャンセルしました。{count, plural, other {#}} 曲を追加しました",
+					"firstImportHint": "初期インポート中、しばらくお待ちください",
+					"parsingMusicMetadata": "曲のメタデータを解析してプレイリストに追加中 ({current, plural, other {#}} / {total, plural, other {#}})",
+					"partiallyFailed": "{succeed, plural, other {#}} 曲を追加しましたが、うち {errored, plural, other {#}} 曲の追加に失敗しました",
+					"success": "すべての {count, plural, other {#}} 曲を追加しました"
 				}
 			},
+			"addLocalMusicFolder": {
+				"label": "ローカルフォルダーを追加"
+			},
 			"cover": {
-				"changeCoverToAuto": "更换成自动封面",
-				"uploadCoverImage": "上传封面图片"
+				"changeCoverToAuto": "自動カバーに変更",
+				"uploadCoverImage": "カバー画像をアップロード"
+			},
+			"folderScanRefresh": {
+				"depthDialog": {
+					"description": "今回のスキャンで選択したディレクトリのサブフォルダーに入るかどうかを決定します。",
+					"recursive": "サブフォルダーを再帰的にスキャン",
+					"shallow": "現在のフォルダーのみスキャン",
+					"title": "スキャン範囲を選択"
+				},
+				"label": "フォルダーを更新",
+				"link": "ローカルフォルダーにリンク",
+				"relink": "ローカルフォルダーに再リンク",
+				"toast": {
+					"canceling": "キャンセル中...",
+					"empty": "このフォルダーにオーディオファイルが見つかりません",
+					"linked": "フォルダーをリンクしました。スキャンを開始します...",
+					"scanCanceled": "スキャンをキャンセルしました",
+					"scanFailed": "再スキャンに失敗：{error}",
+					"scanning": "フォルダーを再スキャン中...",
+					"unlinked": "このプレイリストのフォルダーリンクを解除しました"
+				},
+				"unlink": "フォルダーのリンクを解除"
 			},
 			"music": {
 				"dropdown": {
