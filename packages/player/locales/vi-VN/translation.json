@@ -120,11 +120,37 @@
 			"title": "Trang phát triển Apple Music Like Lyrics",
 			"warning": "Nội dung này chỉ dùng cho mục đích phát triển và thử nghiệm, chỉ dành cho tác giả sử dụng, việc sử dụng tùy tiện có thể gây ra những tình huống không lường trước được!"
 		},
+		"androidMediaCapture": {
+			"capture": "Bắt phiên này",
+			"captured": "Đang bắt",
+			"disconnect": "Ngắt kết nối phiên hiện tại",
+			"noSessions": "Hiện không có phiên media nào để bắt. Hãy phát nhạc trong ứng dụng khác rồi quay lại.",
+			"openSettings": "Mở cài đặt quyền nghe thông báo",
+			"permissionHint": "Nhấn nút bên dưới để mở cài đặt hệ thống, tìm AMLL Player và bật công tắc.",
+			"permissionRequired": "Cần quyền nghe thông báo",
+			"refresh": "Đã cấp quyền, làm mới",
+			"refreshList": "Làm mới",
+			"sessionList": "Phiên media đang hoạt động",
+			"tip": "Tính năng này đọc thông tin phát (tiêu đề, nghệ sĩ, ảnh bìa, tiến độ) mà các ứng dụng khác cung cấp qua MediaSession của hệ thống và cho phép phát/tạm dừng/chuyển bài/tua. Cần quyền nghe thông báo.",
+			"title": "Bắt phiên media hệ thống",
+			"lyricOffset": {
+				"adjust": "Lệch lời",
+				"title": "Lệch dòng thời gian lời",
+				"hint": "+ dịch lời về sau (âm thanh chậm hơn lời, hay gặp ở Dolby Atmos do im lặng đầu mã hoá). Tự động ghi nhớ.",
+				"current": "Hiện tại: {{ms}} ms",
+				"reset": "Về 0",
+				"banner": "Lời bị trễ？ Chạm để căn chỉnh →",
+				"preset": {
+					"dolbyAtmos": "Căn chỉnh Dolby Atmos"
+				}
+			}
+		},
 		"main": {
 			"loadingPlaylist": "Đang tải danh sách bài hát",
 			"menu": {
 				"asWSProtocolReceiver": "Trạng thái nhận WS Protocol",
 				"asWSProtocolSenderWIP": "Gửi trạng thái WS Protocol (đang triển khai)",
+				"enterAndroidMediaCapture": "Bắt phiên media hệ thống (Android)",
 				"enterWSProtocolMode": "Vào chế độ WS Protocol",
 				"settings": "Cài đặt"
 			},

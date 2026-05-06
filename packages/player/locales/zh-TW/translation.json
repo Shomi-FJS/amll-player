@@ -120,11 +120,37 @@
 			"title": "Apple Music Like Lyrics 開發者頁面",
 			"warning": "這裡的東西用於開發調試用途，僅供作者方便之用，隨便使用可能有意想不到的情況出現！（頁面內容僅中文）"
 		},
+		"androidMediaCapture": {
+			"capture": "捕捉此會話",
+			"captured": "正在捕捉",
+			"disconnect": "斷開當前會話",
+			"noSessions": "目前沒有可捕捉的媒體會話。先在其它應用裡開始播放音樂，再回來。",
+			"openSettings": "打開通知使用權設置",
+			"permissionHint": "點擊下方按鈕跳轉到系統設置，找到 AMLL Player 並打開開關。",
+			"permissionRequired": "需要授予通知使用權",
+			"refresh": "已授權，刷新",
+			"refreshList": "刷新",
+			"sessionList": "活躍媒體會話",
+			"tip": "本功能會讀取其它應用通過系統媒體會話（MediaSession）暴露的當前播放資訊（標題、藝術家、封面、進度），並允許你播放/暫停/切歌/拖動進度。需要授予「通知使用權」才能工作。",
+			"title": "捕捉系統媒體會話",
+			"lyricOffset": {
+				"adjust": "歌詞微調",
+				"title": "歌詞時間軸微調",
+				"hint": "+ 讓歌詞後移（音頻比歌詞慢，常見於杜比全景聲前導靜音）。設定會自動記憶。",
+				"current": "目前：{{ms}} ms",
+				"reset": "歸零",
+				"banner": "出現歌詞延遲？點我試試 →",
+				"preset": {
+					"dolbyAtmos": "杜比全景聲對齊"
+				}
+			}
+		},
 		"main": {
 			"loadingPlaylist": "載入歌單中",
 			"menu": {
 				"asWSProtocolReceiver": "作為狀態接收者",
 				"asWSProtocolSenderWIP": "作為狀態發送者（作業中）",
+				"enterAndroidMediaCapture": "捕捉系統媒體會話（Android）",
 				"enterWSProtocolMode": "進入 WS Protocol 模式",
 				"settings": "設定"
 			},

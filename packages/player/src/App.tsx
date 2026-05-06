@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import styles from "./App.module.css";
+import { AndroidMediaCaptureContext } from "./components/AndroidMediaCaptureContext/index.tsx";
 import { AppContainer } from "./components/AppContainer/index.tsx";
 import { ExtensionInjectPoint } from "./components/ExtensionInjectPoint/index.tsx";
 import { LocalMusicContext } from "./components/LocalMusicContext/index.tsx";
@@ -62,6 +63,11 @@ function App() {
 				<WSProtocolMusicContext
 					key={MusicContextMode.WSProtocol}
 					isLyricOnly={false}
+				/>
+			)}
+			{musicContextMode === MusicContextMode.AndroidMediaCapture && (
+				<AndroidMediaCaptureContext
+					key={MusicContextMode.AndroidMediaCapture}
 				/>
 			)}
 

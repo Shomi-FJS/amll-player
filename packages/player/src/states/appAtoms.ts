@@ -13,6 +13,7 @@ export enum DarkMode {
 export enum MusicContextMode {
 	Local = "local",
 	WSProtocol = "ws-protocol",
+	AndroidMediaCapture = "android-media-capture",
 }
 
 export const displayLanguageAtom = atomWithStorage(
@@ -35,6 +36,18 @@ export const musicContextModeAtom = atomWithStorage(
  */
 export const lyricDBVersionAtom = atomWithStorage<string | null>(
 	"amll-player.lyricDBVersion",
+	null,
+	undefined,
+	{ getOnInit: true },
+);
+
+/**
+ * 歌词库完整性校验版本：只有在本地条目数与远端 file_count 一致、
+ * 且同步过程无任何失败条目时，才会被写入为对应 commit。
+ * 用于在 Android WebView 上检测 IndexedDB 丢条目后触发重建。
+ */
+export const lyricDBIntegrityVersionAtom = atomWithStorage<string | null>(
+	"amll-player.lyricDBIntegrityVersion",
 	null,
 	undefined,
 	{ getOnInit: true },
@@ -153,3 +166,39 @@ export const currentSongWritersAtom = atom<string[]>([]);
 export const currentPlaylistAtom = atom<SongData[]>([]);
 
 export const currentPlaylistMusicIndexAtom = atom(0);
+
+// ── Android 媒体会话捕捉相关 ──
+export interface AndroidMediaSessionInfo {
+	packageName: string;
+	sessionId: number;
+	isCurrent: boolean;
+}
+
+export const androidMediaCaptureSessionsAtom = atom<AndroidMediaSessionInfo[]>(
+	[],
+);
+
+export const androidMediaCaptureSelectedPackageAtom = atom<string>("");
+
+export const androidMediaCapturePermissionAtom = atom<boolean>(false);
+
+/**
+ * 当前 Android 捕捉会话播放的歌曲对应的 lyricOffsets 主键；空串代表当前没有
+ * 已识别歌词的歌曲（无歌词或尚未匹配完成），UI 据此判断是否显示偏移滑块。
+ * 由 AndroidMediaCaptureContext 在歌词匹配成功后写入。
+ */
+export const androidMediaCaptureLyricOffsetKeyAtom = atom<string>("");
+
+/**
+ * 当前歌曲歌词偏移量（毫秒，+ 表示歌词后移）。
+ * UI 滑块拖动时实时写入；AndroidMediaCaptureContext 监听该原子重新对原始歌词
+ * 行应用偏移并 set musicLyricLinesAtom。松手时由 UI 端持久化到 Dexie。
+ */
+export const androidMediaCaptureLyricOffsetMsAtom = atom<number>(0);
+
+/**
+ * 当前歌曲的「尾部时长」：音频总时长 - TTML 最后一行 endTime（毫秒）。
+ * 大于阈值时 UI 推断歌词可能存在延迟（如杜比全景声前导静音），弹出顶部提示。
+ * 0 表示尚未计算或不可用（无歌词 / 无 duration）。
+ */
+export const androidMediaCaptureLyricTailMsAtom = atom<number>(0);

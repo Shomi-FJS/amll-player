@@ -120,11 +120,37 @@
 			"title": "Apple Music Like Lyrics 開発者ページ",
 			"warning": "此处的东西用于开发调试用途，仅供作者方便之用，随便使用可能有意想不到的情况出现！（页面内容仅中文）"
 		},
+		"androidMediaCapture": {
+			"capture": "このセッションをキャプチャ",
+			"captured": "キャプチャ中",
+			"disconnect": "現在のセッションを切断",
+			"noSessions": "キャプチャ可能なメディアセッションがありません。他のアプリで音楽を再生してから戻ってきてください。",
+			"openSettings": "通知の利用権限の設定を開く",
+			"permissionHint": "下のボタンでシステム設定を開き、AMLL Player を見つけてオンにしてください。",
+			"permissionRequired": "通知の利用権限が必要です",
+			"refresh": "許可済み、更新",
+			"refreshList": "更新",
+			"sessionList": "アクティブなメディアセッション",
+			"tip": "他のアプリがシステム MediaSession を通じて公開している再生情報（タイトル、アーティスト、カバー、進捗）を読み取り、再生/一時停止/曲切替/シークを可能にします。動作には「通知の利用」権限が必要です。",
+			"title": "システムメディアセッションのキャプチャ",
+			"lyricOffset": {
+				"adjust": "歌詞調整",
+				"title": "歌詞タイムライン調整",
+				"hint": "+ で歌詞を遅らせ（ドルビーアトモスなどエンコーダー前導無音を補正）。自動保存されます。",
+				"current": "現在：{{ms}} ms",
+				"reset": "リセット",
+				"banner": "歌詞がずれていますか？タップして調整 →",
+				"preset": {
+					"dolbyAtmos": "Dolby Atmos を合わせる"
+				}
+			}
+		},
 		"main": {
 			"loadingPlaylist": "プレイリストを読み込んでいます",
 			"menu": {
 				"asWSProtocolReceiver": "ステータス受信機として",
 				"asWSProtocolSenderWIP": "ステータス送信者として（準備中）",
+				"enterAndroidMediaCapture": "システムメディアセッションのキャプチャ（Android）",
 				"enterWSProtocolMode": "WS プロトコル・モードに入る",
 				"settings": "設定"
 			},

@@ -8,9 +8,16 @@ import {
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { db } from "../../dexie.ts";
+import type { SongLyricSourceInfo } from "../../utils/lyricSources.ts";
 import { readLocalMusicMetadata } from "../../utils/player.ts";
 import { getLyricFormatFromExtension, Option } from "./common.tsx";
 import { SongContext } from "./song-ctx.ts";
+
+const CUSTOM_LYRIC_SOURCE: SongLyricSourceInfo = {
+	type: "custom",
+	id: "manual",
+	name: "自定义词源",
+};
 
 const MetaInput: FC<
 	TextField.RootProps & {
@@ -93,6 +100,7 @@ export const MetadataTabContent: FC = () => {
 			db.songs.update(song, (s) => {
 				s.lyricFormat = format;
 				s.lyric = content;
+				s.lyricSource = CUSTOM_LYRIC_SOURCE;
 				if (format === "ttml") {
 					s.translatedLrc = "";
 					s.romanLrc = "";

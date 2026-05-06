@@ -13,8 +13,21 @@ import { Trans, useTranslation } from "react-i18next";
 import { ExtensionInjectPoint } from "../../components/ExtensionInjectPoint/index.tsx";
 import { TTMLImportDialog } from "../../components/TTMLImportDialog/index.tsx";
 import { db } from "../../dexie.ts";
+import type { SongLyricSourceInfo } from "../../utils/lyricSources.ts";
 import { getLyricFormatFromExtension, Option } from "./common.tsx";
 import { SongContext } from "./song-ctx.ts";
+
+const CUSTOM_LYRIC_SOURCE: SongLyricSourceInfo = {
+	type: "custom",
+	id: "manual",
+	name: "自定义词源",
+};
+
+const AMLLDB_LYRIC_SOURCE: SongLyricSourceInfo = {
+	type: "amlldb",
+	id: "amlldb",
+	name: "AMLLDB",
+};
 
 export const LyricTabContent: FC = () => {
 	const song = useContext(SongContext);
@@ -93,15 +106,16 @@ export const LyricTabContent: FC = () => {
 			saveLyricContent: string,
 			saveTranslatedLyricContent: string,
 			saveRomanLyricContent: string,
+			saveLyricSource: SongLyricSourceInfo = CUSTOM_LYRIC_SOURCE,
 		) => {
 			if (song === undefined) return;
 			db.songs.update(song, (song) => {
-				song.lyric = saveLyricFormat;
 				if (saveLyricFormat === "none") {
 					song.lyricFormat = "none";
 					song.lyric = "";
 					song.translatedLrc = "";
 					song.romanLrc = "";
+					song.lyricSource = { type: "none" };
 					setLyricFormat("none");
 					setLyricContent("");
 					setTranslatedLyricContent("");
@@ -113,6 +127,7 @@ export const LyricTabContent: FC = () => {
 					song.lyric = saveLyricContent;
 					song.translatedLrc = "";
 					song.romanLrc = "";
+					song.lyricSource = saveLyricSource;
 					setLyricFormat("ttml");
 					setLyricContent(saveLyricContent);
 					setTranslatedLyricContent("");
@@ -123,6 +138,7 @@ export const LyricTabContent: FC = () => {
 				song.lyric = saveLyricContent;
 				song.translatedLrc = saveTranslatedLyricContent;
 				song.romanLrc = saveRomanLyricContent;
+				song.lyricSource = saveLyricSource;
 				setLyricFormat(saveLyricFormat);
 				setLyricContent(saveLyricContent);
 				setTranslatedLyricContent(saveTranslatedLyricContent);
@@ -253,7 +269,7 @@ export const LyricTabContent: FC = () => {
 				<TTMLImportDialog
 					defaultValue={song ? `${song.songArtists} - ${song.songName}` : ""}
 					onSelectedLyric={(ttmlContent) => {
-						saveData("ttml", ttmlContent, "", "");
+						saveData("ttml", ttmlContent, "", "", AMLLDB_LYRIC_SOURCE);
 					}}
 				/>
 				<Button variant="soft" onClick={openLocalLyricFile}>

@@ -1,7 +1,16 @@
-.resultCard {
-	display: block;
+.resultRow {
+	display: flex;
+	align-items: stretch;
+	gap: 0.5em;
 	margin-top: 1em;
 	width: 100%;
+}
+
+.resultCard {
+	display: block;
+	text-align: left;
+	flex: 1;
+	min-width: 0;
 
 	.name {
 		opacity: 0.5;
@@ -15,4 +24,39 @@
 		font-size: 0.8em;
 		opacity: 0.8;
 	}
+}
+
+.metaButton {
+	flex-shrink: 0;
+	align-self: center;
+}
+
+.metaList {
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.25em 0.75em;
+	max-height: 320px;
+	overflow: auto;
+	font-size: 0.85em;
+}
+
+/* 标签列不参与复制：避免框选时把「专辑 / 网易云 ID …」这些固定文案
+   也粘贴出来，污染剪贴板。 */
+.metaKey {
+	opacity: 0.6;
+	font-weight: 500;
+	white-space: nowrap;
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: default;
+}
+
+/* 值列允许滑动选择复制；显式开启避免被外层组件的 user-select: none 继承。 */
+.metaValue {
+	word-break: break-all;
+	user-select: text;
+	-webkit-user-select: text;
+	cursor: text;
 }

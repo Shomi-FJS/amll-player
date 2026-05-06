@@ -1,6 +1,7 @@
 import { musicPlayingPositionAtom } from "@applemusic-like-lyrics/react-full";
 import {
 	ArrowLeftIcon,
+	LayersIcon,
 	Pencil1Icon,
 	PlayIcon,
 	PlusIcon,
@@ -42,6 +43,7 @@ import {
 	scanFolderAndImportToPlaylist,
 } from "../../utils/importMusic.ts";
 import { emitAudioThread, pickDirectoryTreeUri } from "../../utils/player.ts";
+import { LyricSourcesEditor } from "../settings/lyricSources.tsx";
 import styles from "./index.module.css";
 
 export type Loadable<Value> =
@@ -145,6 +147,15 @@ export const Component: FC = () => {
 	const setPlaylist = useSetAtom(currentPlaylistAtom);
 	const setPlayIndex = useSetAtom(currentPlaylistMusicIndexAtom);
 	const setPosition = useSetAtom(musicPlayingPositionAtom);
+	const updatePlaylistLyricSources = useCallback(
+		(sources: NonNullable<typeof playlist>["lyricSources"]) => {
+			db.playlists.update(Number(param.id), (obj) => {
+				obj.lyricSources = sources;
+				obj.updateTime = Date.now();
+			});
+		},
+		[param.id],
+	);
 
 	const importMusicPaths = useCallback(
 		async (results: string[]) => {
@@ -486,6 +497,37 @@ export const Component: FC = () => {
 											{t("page.playlist.addLocalMusic.label", "添加本地歌曲")}
 										</Button>
 									)}
+									<Dialog.Root>
+										<Dialog.Trigger>
+											<Button variant="soft">
+												<LayersIcon />
+												{t("page.playlist.lyricSources.label", "歌词来源")}
+											</Button>
+										</Dialog.Trigger>
+										<Dialog.Content maxWidth="720px">
+											<Dialog.Title>
+												{t("page.playlist.lyricSources.title", "歌词来源")}
+											</Dialog.Title>
+											<Dialog.Description size="2" color="gray" mb="3">
+												{t(
+													"page.playlist.lyricSources.description",
+													"此配置仅保存到当前歌单。导入歌曲时会按下方顺序尝试获取歌词，列表越靠前优先级越高。",
+												)}
+											</Dialog.Description>
+											<LyricSourcesEditor
+												value={playlist?.lyricSources}
+												onChange={updatePlaylistLyricSources}
+												showTitle={false}
+											/>
+											<Flex gap="3" mt="4" justify="end">
+												<Dialog.Close>
+													<Button variant="soft">
+														<Trans i18nKey="common.dialog.close">关闭</Trans>
+													</Button>
+												</Dialog.Close>
+											</Flex>
+										</Dialog.Content>
+									</Dialog.Root>
 									{platform() === "android" && !playlist?.folderScanTreeUri && (
 										<Button variant="soft" onClick={onAddLocalMusicFolder}>
 											<PlusIcon />

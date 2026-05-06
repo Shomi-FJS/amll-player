@@ -120,11 +120,37 @@
 			"title": "Apple Music Like Lyrics Developer Page",
 			"warning": "This page is for develop usage only, use it at your own risk! (Chinese only)"
 		},
+		"androidMediaCapture": {
+			"capture": "Capture this session",
+			"captured": "Capturing",
+			"disconnect": "Disconnect current session",
+			"noSessions": "No active media session can be captured. Start playing music in another app, then come back.",
+			"openSettings": "Open Notification Listener settings",
+			"permissionHint": "Tap the button below to open system settings, find AMLL Player and turn on the toggle.",
+			"permissionRequired": "Notification listener permission required",
+			"refresh": "Granted, refresh",
+			"refreshList": "Refresh",
+			"sessionList": "Active media sessions",
+			"tip": "This feature reads playback information (title, artist, cover, progress) exposed by other apps via the system MediaSession, and lets you play/pause/skip/seek. The Notification Listener permission is required.",
+			"title": "Capture system media session",
+			"lyricOffset": {
+				"adjust": "Lyric offset",
+				"title": "Lyric timeline offset",
+				"hint": "+ shifts lyrics later (when audio lags lyrics, e.g. Dolby Atmos priming silence). Saved automatically.",
+				"current": "Current: {{ms}} ms",
+				"reset": "Reset",
+				"banner": "Lyric out of sync? Try this →",
+				"preset": {
+					"dolbyAtmos": "Align Dolby Atmos"
+				}
+			}
+		},
 		"main": {
 			"loadingPlaylist": "Loading playlist",
 			"menu": {
 				"asWSProtocolReceiver": "As WS Protocol Receiver",
 				"asWSProtocolSenderWIP": "As WS Protocol Sender (On development)",
+				"enterAndroidMediaCapture": "Capture system media session (Android)",
 				"enterWSProtocolMode": "Start WS Protocol mode",
 				"settings": "Settings"
 			},
@@ -193,7 +219,20 @@
 					"playMusic": "Play",
 					"removeFromPlaylist": "Delete from Playlist"
 				},
+				"lyricSource": {
+					"amlldb": "AMLL DB",
+					"custom": "Custom source",
+					"embedded": "Embedded",
+					"local": "Song folder",
+					"none": "No lyrics",
+					"unknown": "Unknown source"
+				},
 				"unknownSongName": "Unknown Music ID {id}"
+			},
+			"lyricSources": {
+				"description": "This configuration is saved only to the current playlist. During import, lyric sources are tried in the order below; higher entries have higher priority.",
+				"label": "Lyric Sources",
+				"title": "Lyric Sources"
 			},
 			"playAll": "Play All",
 			"shufflePlayAll": "Shuffle",
@@ -330,6 +369,38 @@
 				},
 				"enableLyricTranslationLine": "Show Translation",
 				"subtitle": "Lyrics"
+			},
+			"lyricSources": {
+				"subtitle": "Lyric Sources",
+				"description": "Control which sources to use, and in what order, when fetching lyrics during music import. Higher entries win; the first source that returns a result is used.",
+				"tip": "Built-in sources \"AMLL TTML DB\" and \"Song folder lyrics\" cannot be deleted, but can be reordered or toggled.",
+				"type": {
+					"amlldb": "AMLL TTML DB",
+					"local": "Song folder lyrics",
+					"custom": "Custom"
+				},
+				"row": {
+					"moveUp": "Move up",
+					"moveDown": "Move down",
+					"delete": "Delete"
+				},
+				"addCustom": "Add custom source",
+				"emptyName": "(Unnamed source)",
+				"form": {
+					"name": {
+						"label": "Name",
+						"placeholder": "e.g. KuGou Mirror"
+					},
+					"url": {
+						"label": "URL template",
+						"placeholder": "https://example.com/api?title={songName}&artist={songArtists}",
+						"description": "Supports placeholders {placeholder} ; values are URL-encoded automatically."
+					},
+					"format": {
+						"label": "Response format",
+						"auto": "Auto detect"
+					}
+				}
 			},
 			"lyricFont": {
 				"fontFamily": {

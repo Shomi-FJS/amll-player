@@ -15,6 +15,12 @@
 	border-radius: 1em 1em 0 0;
 	overflow: hidden;
 	color: white;
+	/* 始终独占合成层：转场结束停在 translateY(0%) 时浏览器原本会回收 GPU 层，
+	   下一次行切换/进退场会触发整页重栅格化导致掉帧。配合下方 contain 限制
+	   布局/样式/绘制的失效传播范围，避免歌词面板的频繁刷新波及外层 UI。 */
+	will-change: transform;
+	contain: layout style paint;
+	backface-visibility: hidden;
 
 	&.opened {
 		pointer-events: auto;
@@ -23,5 +29,20 @@
 			transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
 		transform: translateY(0%);
 		border-radius: 0 0 0 0;
+	}
+}
+
+.returnToCoverArea {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: clamp(80px, 14vh, 180px);
+	z-index: 10;
+	cursor: pointer;
+	touch-action: manipulation;
+
+	@media screen and (orientation: landscape) {
+		display: none;
 	}
 }

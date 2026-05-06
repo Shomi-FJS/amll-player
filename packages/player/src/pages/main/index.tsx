@@ -10,6 +10,7 @@ import {
 	Text,
 } from "@radix-ui/themes";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { platform } from "@tauri-apps/plugin-os";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useAtomValue } from "jotai";
 import { type FC, useRef } from "react";
@@ -97,6 +98,15 @@ export const Component: FC = () => {
 										</DropdownMenu.Item>
 									</DropdownMenu.SubContent>
 								</DropdownMenu.Sub>
+								{platform() === "android" && (
+									<DropdownMenu.Item asChild>
+										<Link to="/android-media">
+											<Trans i18nKey="page.main.menu.enterAndroidMediaCapture">
+												捕捉系统媒体会话（Android）
+											</Trans>
+										</Link>
+									</DropdownMenu.Item>
+								)}
 								<DropdownMenu.Item asChild>
 									<Link to="/settings">
 										<Trans i18nKey="page.main.menu.settings">设置</Trans>

@@ -1,12 +1,26 @@
+import { parseTTML } from "@applemusic-like-lyrics/lyric";
 import { Button, Flex, Text } from "@radix-ui/themes";
 import { path } from "@tauri-apps/api";
+import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { platform } from "@tauri-apps/plugin-os";
 import type { TFunction } from "i18next";
 import md5 from "md5";
 import pLimit from "p-limit";
 import { createElement, type ReactNode } from "react";
 import { type Id, toast } from "react-toastify";
-import { db, type Song } from "../dexie.ts";
+import { db, type Song, type TTMLDBLyricEntry } from "../dexie.ts";
+import { findBestTTMLMatch, loadAllTTMLEntries } from "./lyricAutoMatch.ts";
+import {
+	buildCustomLyricSourceUrl,
+	DEFAULT_LYRIC_SOURCES,
+	guessLyricFormat,
+	type LyricSearchSongInfo,
+	type LyricSourceConfig,
+	type LyricSourceResult,
+	normalizeLyricSources,
+	type SongLyricSourceInfo,
+} from "./lyricSources.ts";
 import {
 	cancelScanAudioInTreeUri,
 	readLocalMusicMetadata,
@@ -18,23 +32,6 @@ import {
 const IMPORT_CONCURRENCY = 8;
 const PROGRESS_THROTTLE_MS = 80;
 const DB_FLUSH_BATCH = 32;
-// 首次 Android 文件夹扫描时 SAF/JNI 冷启动明显慢于后续。用专属标记避免普通文件
-// 导入影响首次扫描提示。
-const FIRST_FOLDER_SCAN_FLAG_KEY = "amll-player:hadFirstFolderScan";
-export const isFirstEverFolderScan = (): boolean => {
-	try {
-		return !localStorage.getItem(FIRST_FOLDER_SCAN_FLAG_KEY);
-	} catch {
-		return false;
-	}
-};
-const markFirstFolderScanDone = (): void => {
-	try {
-		localStorage.setItem(FIRST_FOLDER_SCAN_FLAG_KEY, "1");
-	} catch {
-		// 隐私模式 / 配额满 → 忽略，下次仍当作首次提示一遍即可
-	}
-};
 
 export interface ImportFailure {
 	path: string;
@@ -54,54 +51,70 @@ export interface ScanAndImportResult {
 	failedList: ImportFailure[];
 }
 
-/** 解析阶段的进度回调，UI 用它在对话框/页面里显示实时数字。 */
-export type ImportProgressCallback = (progress: {
-	processed: number;
-	total: number;
-}) => void;
+type Translator = (
+	key: string,
+	defaultValue: string,
+	opts?: Record<string, unknown>,
+) => string;
+
+async function fetchWithFallback(
+	input: string,
+	init?: RequestInit,
+): Promise<Response> {
+	try {
+		return await tauriFetch(input, {
+			...init,
+			connectTimeout: 10_000,
+		});
+	} catch (err) {
+		if (typeof fetch !== "function") throw err;
+		return await fetch(input, init);
+	}
+}
+
+type LocalLyricCandidate = {
+	path: string;
+	stem: string;
+	format: string;
+	raw: string;
+	ttmlEntry?: TTMLDBLyricEntry;
+};
+
+type LocalLyricMatch = Pick<LocalLyricCandidate, "format" | "raw">;
+
+type LocalLyricCache = Map<string, Promise<LocalLyricCandidate[]>>;
+type MatchedLyricSourceResult = LyricSourceResult & {
+	lyricSource: SongLyricSourceInfo;
+};
 
 export async function scanFolderAndImportToPlaylist(opts: {
 	playlistId: number;
 	treeUri: string;
 	t: TFunction;
 	recursive?: boolean;
-	/** 外部传入的中止信号；触发后等价于点击 toast 上的「取消」。 */
+	/** 外部中止信号：abort 会同时取消文件扫描与导入流程。 */
 	signal?: AbortSignal;
-	/** 解析阶段进度回调；扫描阶段不会触发。 */
-	onProgress?: ImportProgressCallback;
+	/** 导入进度回调：开始/结束时实参为 null。 */
+	onProgress?: (p: { processed: number; total: number } | null) => void;
 }): Promise<ScanAndImportResult> {
 	const { playlistId, treeUri, t, recursive = true, signal, onProgress } = opts;
 	const importController = new AbortController();
 	let cancelRequested = false;
-	const currentMessage = t(
-		"page.playlist.folderScanRefresh.toast.scanning",
-		"正在重新扫描文件夹...",
-	);
 
-	// 首次扫描时给一个独立 loading toast。它只覆盖 scanAudioInTreeUri 这一段；
-	// 扫描完成、取消或失败都会关闭，不混入扫描/解析进度 toast。
-	const firstScanHintToastId: Id | null = isFirstEverFolderScan()
-		? toast.loading(
-				t(
-					"page.playlist.addLocalMusic.toast.firstImportHint",
-					"初始化导入中，请耐心等待",
-				),
-				{ closeOnClick: false, draggable: false, closeButton: false },
-			)
-		: null;
-	const dismissFirstScanHint = () => {
-		if (firstScanHintToastId !== null) toast.dismiss(firstScanHintToastId);
-	};
-
-	// toast 内容是静态 ReactNode；点击取消后必须主动 toast.update 才能让按钮变
-	// 灰、文案变成「正在取消...」，否则用户会以为没响应而连点。
 	const onCancelClick = () => {
 		if (cancelRequested) return;
 		cancelRequested = true;
 		void cancelScanAudioInTreeUri();
 		importController.abort();
-		toast.update(toastId, { render: renderToast(currentMessage) });
 	};
+
+	// 桥接外部 signal：已 abort 则立刻标为取消；否则监听后续 abort。
+	if (signal?.aborted) {
+		onCancelClick();
+	} else if (signal) {
+		signal.addEventListener("abort", onCancelClick, { once: true });
+	}
+	onProgress?.(null);
 
 	const renderToast = (message: string): ReactNode =>
 		createElement(
@@ -118,7 +131,7 @@ export async function scanFolderAndImportToPlaylist(opts: {
 					size: "1",
 					variant: "soft",
 					color: "gray",
-					onClick: () => onCancelClick(),
+					onClick: onCancelClick,
 					disabled: cancelRequested,
 					style: { flexShrink: 0 },
 				},
@@ -128,27 +141,27 @@ export async function scanFolderAndImportToPlaylist(opts: {
 			),
 		);
 
-	const toastId: Id = toast(renderToast(currentMessage), {
-		closeOnClick: false,
-		autoClose: false,
-		closeButton: false,
-		draggable: false,
-		isLoading: true,
-	});
-
-	// 外部 signal（如新建歌单对话框的「取消」按钮）走和 toast 同一条取消路径，
-	// 既能中止扫描/导入，又能让 toast UI 同步显示「正在取消...」。
-	if (signal) {
-		if (signal.aborted) onCancelClick();
-		else signal.addEventListener("abort", onCancelClick, { once: true });
-	}
+	const toastId: Id = toast(
+		renderToast(
+			t(
+				"page.playlist.folderScanRefresh.toast.scanning",
+				"正在重新扫描文件夹...",
+			),
+		),
+		{
+			closeOnClick: false,
+			autoClose: false,
+			closeButton: false,
+			draggable: false,
+			isLoading: true,
+		},
+	);
 
 	let uris: string[];
 	try {
 		uris = await scanAudioInTreeUri(treeUri, recursive);
 	} catch (err) {
 		toast.done(toastId);
-		dismissFirstScanHint();
 		const msg = err instanceof Error ? err.message : String(err);
 		if (msg.includes(SCAN_CANCELED_TOKEN) || cancelRequested) {
 			toast.info(
@@ -176,11 +189,8 @@ export async function scanFolderAndImportToPlaylist(opts: {
 		};
 	}
 
-	markFirstFolderScanDone();
-
 	if (uris.length === 0) {
 		toast.done(toastId);
-		dismissFirstScanHint();
 		toast.warn(
 			t(
 				"page.playlist.folderScanRefresh.toast.empty",
@@ -196,7 +206,6 @@ export async function scanFolderAndImportToPlaylist(opts: {
 	}
 
 	toast.done(toastId);
-	dismissFirstScanHint();
 
 	const result = await importAudioFilesToPlaylist({
 		playlistId,
@@ -205,6 +214,7 @@ export async function scanFolderAndImportToPlaylist(opts: {
 		signal: importController.signal,
 		onProgress,
 	});
+	onProgress?.(null);
 
 	return {
 		canceled: result.canceled || cancelRequested,
@@ -214,12 +224,108 @@ export async function scanFolderAndImportToPlaylist(opts: {
 	};
 }
 
+// 优先级从高到低：
+// 1. ttml：AMLL 原生格式，逐词 + 翻译 + 音译 + 元数据，最完整。
+// 2. 逐词级：lys / yrc / qrc / alrc(LRC A2) / eslrc，按格式表达力排序。
+// 3. 逐行级：lyl（带 end 时间）> lrc（仅 start 时间）。
+// 同一首歌存在多个候选时挑优先级最高的，避免拿到逐行 lrc 而忽略了逐词版。
+const LOCAL_LYRIC_EXTENSIONS = [
+	"ttml",
+	"lys",
+	"yrc",
+	"qrc",
+	"alrc",
+	"eslrc",
+	"lyl",
+	"lrc",
+];
+const LOCAL_LYRIC_EXTENSION_PRIORITY = new Map(
+	LOCAL_LYRIC_EXTENSIONS.map((ext, index) => [ext, index]),
+);
+
+function getLocalLyricNameParts(fileName: string) {
+	const dotIndex = fileName.lastIndexOf(".");
+	if (dotIndex <= 0) return null;
+	const ext = fileName.slice(dotIndex + 1).toLowerCase();
+	if (!LOCAL_LYRIC_EXTENSION_PRIORITY.has(ext)) return null;
+	return {
+		ext,
+		stem: fileName.slice(0, dotIndex).toLowerCase(),
+	};
+}
+
+async function loadLocalLyricCandidates(
+	rootDir: string,
+): Promise<LocalLyricCandidate[]> {
+	const candidates: LocalLyricCandidate[] = [];
+	const visited = new Set<string>();
+	const walk = async (dir: string) => {
+		if (visited.has(dir)) return;
+		visited.add(dir);
+		let entries: Awaited<ReturnType<typeof readDir>>;
+		try {
+			entries = await readDir(dir);
+		} catch (err) {
+			console.warn("读取本地歌词目录失败", dir, err);
+			return;
+		}
+		await Promise.all(
+			entries.map(async (entry) => {
+				const entryPath = await path.join(dir, entry.name);
+				if (entry.isDirectory) {
+					await walk(entryPath);
+					return;
+				}
+				if (!entry.isFile) return;
+				const parts = getLocalLyricNameParts(entry.name);
+				if (!parts) return;
+				try {
+					const raw = await readTextFile(entryPath);
+					// .alrc 是我们约定的 LRC A2 扩展名，但解析器格式标识叫 lrcA2。
+					const format = parts.ext === "alrc" ? "lrcA2" : parts.ext;
+					const candidate: LocalLyricCandidate = {
+						path: entryPath,
+						stem: parts.stem,
+						format,
+						raw,
+					};
+					if (parts.ext === "ttml") {
+						candidate.ttmlEntry = {
+							name: entryPath,
+							content: parseTTML(raw),
+							raw,
+						};
+					}
+					candidates.push(candidate);
+				} catch (err) {
+					console.warn("读取或解析本地歌词失败", entryPath, err);
+				}
+			}),
+		);
+	};
+	await walk(rootDir);
+	return candidates;
+}
+
+function getLocalLyricCandidates(
+	cache: LocalLyricCache,
+	rootDir: string,
+): Promise<LocalLyricCandidate[]> {
+	let promise = cache.get(rootDir);
+	if (!promise) {
+		promise = loadLocalLyricCandidates(rootDir);
+		cache.set(rootDir, promise);
+	}
+	return promise;
+}
+
 export async function importAudioFilesToPlaylist(opts: {
 	playlistId: number;
 	results: string[];
-	t: TFunction;
+	t: Translator;
 	signal?: AbortSignal;
-	onProgress?: ImportProgressCallback;
+	/** 导入进度回调，和 toast 同步被节流触发。 */
+	onProgress?: (p: { processed: number; total: number }) => void;
 }): Promise<ImportResult> {
 	const { playlistId, results, t, signal, onProgress } = opts;
 	const failedList: ImportFailure[] = [];
@@ -227,19 +333,25 @@ export async function importAudioFilesToPlaylist(opts: {
 		return { successCount: 0, failedList, canceled: false };
 	}
 
-	const renderProgressMessage = (): string =>
+	const toastId = toast.loading(
 		t(
 			"page.playlist.addLocalMusic.toast.parsingMusicMetadata",
 			"正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
-			{ current: processed, total: results.length },
-		);
+			{ current: 0, total: results.length },
+		),
+	);
 
 	let processed = 0;
 	let successCount = 0;
 	let canceled = false;
 	const isMobile = platform() === "android" || platform() === "ios";
-
-	const toastId = toast.loading(renderProgressMessage());
+	const isAndroid = platform() === "android";
+	const shouldMatchLocalLyric = isAndroid;
+	const localLyricCache: LocalLyricCache = new Map();
+	const playlistForImport = await db.playlists.get(playlistId);
+	const lyricSources = normalizeLyricSources(
+		playlistForImport?.lyricSources ?? DEFAULT_LYRIC_SOURCES,
+	).filter((source) => source.enabled);
 
 	const checkCanceled = () => {
 		if (signal?.aborted) {
@@ -248,6 +360,13 @@ export async function importAudioFilesToPlaylist(opts: {
 		}
 		return false;
 	};
+
+	let ttmlCandidates: TTMLDBLyricEntry[] = [];
+	try {
+		ttmlCandidates = await loadAllTTMLEntries();
+	} catch (err) {
+		console.warn("加载 TTML DB 用于自动匹配失败", err);
+	}
 
 	let lastProgressAt = 0;
 	const updateProgress = (force = false) => {
@@ -258,7 +377,11 @@ export async function importAudioFilesToPlaylist(opts: {
 		}
 		lastProgressAt = now;
 		toast.update(toastId, {
-			render: renderProgressMessage(),
+			render: t(
+				"page.playlist.addLocalMusic.toast.parsingMusicMetadata",
+				"正在解析音乐元数据以添加歌曲 ({current, plural, other {#}} / {total, plural, other {#}})",
+				{ current: processed, total: results.length },
+			),
 			progress: processed / results.length,
 		});
 		onProgress?.({ processed, total: results.length });
@@ -274,17 +397,10 @@ export async function importAudioFilesToPlaylist(opts: {
 			await db.songs.bulkPut(batch);
 			const playlist = await db.playlists.get(playlistId);
 			const existing = new Set(playlist?.songIds ?? []);
-			// 同一批次内可能出现同 md5（重复扫描结果或不同 raw 路径归一化到
-			// 同一 path），用 seen 去重避免在 songIds 中产生重复条目。
-			const seen = new Set<string>();
-			const toAdd: string[] = [];
-			for (const s of batch) {
-				if (existing.has(s.id) || flushedIds.has(s.id) || seen.has(s.id))
-					continue;
-				seen.add(s.id);
-				toAdd.push(s.id);
-			}
-			toAdd.reverse();
+			const toAdd = batch
+				.map((s) => s.id)
+				.filter((id) => !existing.has(id) && !flushedIds.has(id))
+				.reverse();
 			if (toAdd.length > 0) {
 				for (const id of toAdd) flushedIds.add(id);
 				await db.playlists.update(playlistId, (obj) => {
@@ -297,6 +413,138 @@ export async function importAudioFilesToPlaylist(opts: {
 	};
 
 	const limit = pLimit(IMPORT_CONCURRENCY);
+
+	const ttmlCandidateEntries = () => ttmlCandidates;
+
+	const matchLocalLyric = async (
+		filePath: string,
+		songForMatch: Pick<Song, "songName" | "songArtists" | "songAlbum">,
+	): Promise<LocalLyricMatch | null> => {
+		if (!shouldMatchLocalLyric) return null;
+		try {
+			const fileStem = (await path.basename(filePath))
+				.replace(/\.[^.]*$/, "")
+				.toLowerCase();
+			const candidates = await getLocalLyricCandidates(
+				localLyricCache,
+				await path.dirname(filePath),
+			);
+			const sameStem = candidates
+				.filter((candidate) => candidate.stem === fileStem)
+				.sort(
+					(a, b) =>
+						(LOCAL_LYRIC_EXTENSION_PRIORITY.get(a.format) ??
+							Number.MAX_SAFE_INTEGER) -
+						(LOCAL_LYRIC_EXTENSION_PRIORITY.get(b.format) ??
+							Number.MAX_SAFE_INTEGER),
+				)[0];
+			if (sameStem) return sameStem;
+			const matchedTTML = findBestTTMLMatch(
+				songForMatch,
+				candidates
+					.map((candidate) => candidate.ttmlEntry)
+					.filter((entry): entry is TTMLDBLyricEntry => !!entry),
+			);
+			return matchedTTML
+				? {
+						format: "ttml",
+						raw: matchedTTML.entry.raw,
+					}
+				: null;
+		} catch (err) {
+			console.warn("本地歌词自动匹配失败", filePath, err);
+			return null;
+		}
+	};
+
+	const fetchCustomLyricSource = async (
+		source: LyricSourceConfig,
+		songForMatch: LyricSearchSongInfo,
+	): Promise<LyricSourceResult | null> => {
+		if (!source.url) return null;
+		const url = buildCustomLyricSourceUrl(source.url, songForMatch);
+		const res = await fetchWithFallback(url);
+		if (!res.ok) return null;
+		const contentType = res.headers.get("content-type") ?? "";
+		if (contentType.includes("application/json")) {
+			const data = (await res.json()) as {
+				lyric?: string;
+				lrc?: string;
+				yrc?: string;
+				ttml?: string;
+				translatedLrc?: string;
+				format?: string;
+			};
+			const lyric = data.lyric ?? data.yrc ?? data.ttml ?? data.lrc ?? "";
+			if (!lyric.trim()) return null;
+			return {
+				format: data.format ?? guessLyricFormat(lyric, source.format),
+				lyric,
+				translatedLrc: data.translatedLrc,
+			};
+		}
+		const lyric = await res.text();
+		if (!lyric.trim()) return null;
+		return {
+			format: guessLyricFormat(lyric, source.format),
+			lyric,
+		};
+	};
+
+	const resolveLyricBySource = async (
+		source: LyricSourceConfig,
+		songForMatch: LyricSearchSongInfo,
+	): Promise<LyricSourceResult | null> => {
+		switch (source.type) {
+			case "local": {
+				if (!songForMatch.filePath) return null;
+				const matched = await matchLocalLyric(
+					songForMatch.filePath,
+					songForMatch,
+				);
+				return matched
+					? {
+							format: matched.format,
+							lyric: matched.raw,
+						}
+					: null;
+			}
+			case "amlldb": {
+				const matched = findBestTTMLMatch(songForMatch, ttmlCandidateEntries());
+				return matched
+					? {
+							format: "ttml",
+							lyric: matched.entry.raw,
+						}
+					: null;
+			}
+			case "custom":
+				return await fetchCustomLyricSource(source, songForMatch);
+		}
+	};
+
+	const resolveLyricBySources = async (
+		songForMatch: LyricSearchSongInfo,
+	): Promise<MatchedLyricSourceResult | null> => {
+		for (const source of lyricSources) {
+			try {
+				const result = await resolveLyricBySource(source, songForMatch);
+				if (result?.lyric) {
+					return {
+						...result,
+						lyricSource: {
+							type: source.type,
+							id: source.id,
+							name: source.name,
+						},
+					};
+				}
+			} catch (err) {
+				console.warn(`歌词源 ${source.name} 获取失败`, err);
+			}
+		}
+		return null;
+	};
 
 	await Promise.all(
 		results.map((raw) =>
@@ -330,14 +578,37 @@ export async function importAudioFilesToPlaylist(opts: {
 					});
 
 					successCount += 1;
+					let lyricFormat = musicInfo.lyricFormat || "none";
+					let lyric = musicInfo.lyric;
+					let translatedLrc = "";
+					let lyricSource: SongLyricSourceInfo = lyric.trim()
+						? { type: "embedded" }
+						: { type: "none" };
+					const songForMatch = {
+						songName: musicInfo.name,
+						songArtists: musicInfo.artist,
+						songAlbum: musicInfo.album,
+						filePath: normalized,
+					};
+					// 源列表（含 AMLLDB）优先级高于内嵌歌词；任何源命中即覆盖。
+					// 全部失败才回退到内嵌歌词。
+					const matched = await resolveLyricBySources(songForMatch);
+					if (matched?.lyric) {
+						lyric = matched.lyric;
+						lyricFormat = matched.format;
+						translatedLrc = matched.translatedLrc ?? "";
+						lyricSource = matched.lyricSource;
+					}
 					const song: Song = {
 						id: pathMd5,
 						filePath: normalized,
 						songName: musicInfo.name,
 						songArtists: musicInfo.artist,
 						songAlbum: musicInfo.album,
-						lyricFormat: musicInfo.lyricFormat || "none",
-						lyric: musicInfo.lyric,
+						lyricFormat,
+						lyric,
+						lyricSource,
+						translatedLrc,
 						cover: coverBlob,
 						duration: musicInfo.duration,
 					};

@@ -120,11 +120,37 @@
 			"title": "Apple Music Like Lyrics 开发者页面",
 			"warning": "此处的东西用于开发调试用途，仅供作者方便之用，随便使用可能有意想不到的情况出现！（页面内容仅中文）"
 		},
+		"androidMediaCapture": {
+			"capture": "捕捉此会话",
+			"captured": "正在捕捉",
+			"disconnect": "断开当前会话",
+			"noSessions": "当前没有可捕捉的媒体会话。先在其它应用里开始播放音乐，再回来。",
+			"openSettings": "打开通知使用权设置",
+			"permissionHint": "点击下方按钮跳转到系统设置，找到 AMLL Player 并打开开关。",
+			"permissionRequired": "需要授予通知使用权",
+			"refresh": "已授权，刷新",
+			"refreshList": "刷新",
+			"sessionList": "活跃媒体会话",
+			"tip": "本功能会读取其它应用通过系统媒体会话（MediaSession）暴露的当前播放信息（标题、艺术家、封面、进度），并允许你播放/暂停/切歌/拖动进度。需要授予「通知使用权」才能工作。",
+			"title": "捕捉系统媒体会话",
+			"lyricOffset": {
+				"adjust": "歌词微调",
+				"title": "歌词时间轴微调",
+				"hint": "+ 让歌词后移（音频比歌词慢，常见于杜比全景声前导静音）。设置会自动记忆。",
+				"current": "当前：{{ms}} ms",
+				"reset": "归零",
+				"banner": "出现歌词延迟？点我试试 →",
+				"preset": {
+					"dolbyAtmos": "杜比全景声对齐"
+				}
+			}
+		},
 		"main": {
 			"loadingPlaylist": "加载歌单中",
 			"menu": {
 				"asWSProtocolReceiver": "作为状态接收者",
 				"asWSProtocolSenderWIP": "作为状态发送者（施工中）",
+				"enterAndroidMediaCapture": "捕捉系统媒体会话（Android）",
 				"enterWSProtocolMode": "进入 WS Protocol 模式",
 				"settings": "设置"
 			},
@@ -193,7 +219,20 @@
 					"playMusic": "播放音乐",
 					"removeFromPlaylist": "从歌单中删除"
 				},
+				"lyricSource": {
+					"amlldb": "AMLL DB",
+					"custom": "自定义源",
+					"embedded": "内嵌歌词",
+					"local": "歌曲目录",
+					"none": "无歌词",
+					"unknown": "来源未知"
+				},
 				"unknownSongName": "未知歌曲 ID {id}"
+			},
+			"lyricSources": {
+				"description": "此配置仅保存到当前歌单。导入歌曲时会按下方顺序尝试获取歌词，列表越靠前优先级越高。",
+				"label": "歌词来源",
+				"title": "歌词来源"
 			},
 			"playAll": "播放全部",
 			"shufflePlayAll": "随机播放",
@@ -330,6 +369,38 @@
 				},
 				"enableLyricTranslationLine": "显示翻译歌词",
 				"subtitle": "歌词内容"
+			},
+			"lyricSources": {
+				"subtitle": "歌词来源",
+				"description": "控制导入歌曲时按何种顺序、从哪些来源获取歌词。列表越靠前优先级越高，第一个返回结果的来源获胜。",
+				"tip": "内置「AMLL TTML DB」「歌曲目录歌词」无法删除，但可以排序与启用/禁用。",
+				"type": {
+					"amlldb": "AMLL TTML DB",
+					"local": "歌曲目录歌词",
+					"custom": "自定义"
+				},
+				"row": {
+					"moveUp": "上移",
+					"moveDown": "下移",
+					"delete": "删除"
+				},
+				"addCustom": "添加自定义歌词源",
+				"emptyName": "（未命名来源）",
+				"form": {
+					"name": {
+						"label": "名称",
+						"placeholder": "例如 KuGou Mirror"
+					},
+					"url": {
+						"label": "URL 模板",
+						"placeholder": "https://example.com/api?title={songName}&artist={songArtists}",
+						"description": "支持占位符 {placeholder} ，将自动进行 URL 编码"
+					},
+					"format": {
+						"label": "返回格式",
+						"auto": "自动识别"
+					}
+				}
 			},
 			"lyricFont": {
 				"fontFamily": {

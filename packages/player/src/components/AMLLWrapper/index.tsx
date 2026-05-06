@@ -1,15 +1,17 @@
 import {
+	hideLyricViewAtom,
 	isLyricPageOpenedAtom,
 	PrebuiltLyricPlayer,
 } from "@applemusic-like-lyrics/react-full";
 import { ContextMenu } from "@radix-ui/themes";
 import classnames from "classnames";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { type FC, useLayoutEffect } from "react";
 import { useTitlebarAutoHide } from "../../utils/useTitlebarAutoHide.ts";
 import { AMLLContextMenuContent } from "../AMLLContextMenu/index.tsx";
 import { AudioQualityDialog } from "../AudioQualityDialog/index.tsx";
 import { BottomLyricInfo } from "../BottomLyricInfo";
+import { LyricOffsetControl } from "../LyricOffsetControl/index.tsx";
 import { RecordPanel } from "../RecordPanel/index.tsx";
 import styles from "./index.module.css";
 import "@applemusic-like-lyrics/core/style.css";
@@ -17,6 +19,8 @@ import "@applemusic-like-lyrics/react-full/style.css";
 
 export const AMLLWrapper: FC = () => {
 	const isLyricPageOpened = useAtomValue(isLyricPageOpenedAtom);
+	const hideLyricView = useAtomValue(hideLyricViewAtom);
+	const setHideLyricView = useSetAtom(hideLyricViewAtom);
 
 	useTitlebarAutoHide(isLyricPageOpened);
 
@@ -44,12 +48,19 @@ export const AMLLWrapper: FC = () => {
 							style={{ width: "100%", height: "100%" }}
 							bottomLineSlot={<BottomLyricInfo />}
 						/>
+						{isLyricPageOpened && !hideLyricView && (
+							<div
+								className={styles.returnToCoverArea}
+								onClick={() => setHideLyricView(true)}
+							/>
+						)}
 					</div>
 				</ContextMenu.Trigger>
 				<AMLLContextMenuContent />
 			</ContextMenu.Root>
 			<AudioQualityDialog />
 			<RecordPanel />
+			<LyricOffsetControl />
 		</>
 	);
 };

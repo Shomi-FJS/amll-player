@@ -18,6 +18,7 @@ use tracing::*;
 
 use crate::server::AMLLWebSocketServer;
 
+mod android_media_capture;
 mod player;
 mod screen_capture;
 mod server;
@@ -1008,6 +1009,13 @@ pub fn run() {
             scan_audio_in_tree_uri,
             cancel_scan_audio_in_tree_uri,
             read_local_music_metadata,
+            android_media_capture::android_media_capture_has_permission,
+            android_media_capture::android_media_capture_open_settings,
+            android_media_capture::android_media_capture_start,
+            android_media_capture::android_media_capture_stop,
+            android_media_capture::android_media_capture_list_sessions,
+            android_media_capture::android_media_capture_select_session,
+            android_media_capture::android_media_capture_send_command,
             restart_app,
             #[cfg(target_os = "windows")]
             set_window_always_on_top,
