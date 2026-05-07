@@ -73,10 +73,6 @@ jobs:
             artifact_name_suffix: macos-x64
             package_extension: tar.gz
             os_runner: macos-latest
-          # - platform: macos-latest # 通用二进制包
-          #   args: "--target universal-apple-darwin"
-          #   name: macOS
-          #   arch: universal
 
     runs-on: ${{ matrix.os_runner }}
     env:
@@ -237,9 +233,9 @@ jobs:
         with:
           name: AMLL Player ${{matrix.name}}-${{matrix.arch}}
           path: |
-            packages/player/src-tauri/target/**/release/bundle/**/*
-            packages/player/src-tauri/target/**/release/amll-player.exe
-            packages/player/src-tauri/target/**/release/amll-player
+            target/**/release/bundle/**/*
+            target/**/release/amll-player.exe
+            target/**/release/amll-player
 
   build-tauri-android:
     name: 构建 Tauri 安卓移动版本
