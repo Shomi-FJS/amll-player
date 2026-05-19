@@ -1,6 +1,11 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+/// Signals that ndk_context has been initialized on Android.
+/// The audio thread waits on this before opening the audio device.
+#[cfg(target_os = "android")]
+pub(crate) static ANDROID_NDK_READY: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
 use std::net::SocketAddr;
 
 use amll_player_core::AudioInfo;
@@ -440,6 +445,11 @@ fn init_logging() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install ring as the default crypto provider for rustls, because multiple providers
+    // (aws-lc-rs and ring) might be enabled in our dependency tree and rustls demands one to be explicitly chosen.
+    #[cfg(target_os = "android")]
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     init_logging();
     info!("AMLL Player is starting!");
     #[allow(unused_mut)]
@@ -514,6 +524,34 @@ pub fn run() {
             theme_watcher::get_system_theme
         ])
         .setup(|app| {
+            #[cfg(target_os = "android")]
+            {
+                if let Some(webview) = app.get_webview_window("main") {
+                    let _ = webview.with_webview(|webview| {
+                        // with_webview is dispatched to the Android UI thread (async).
+                        // After initialize_android_context we set ANDROID_NDK_READY so
+                        // the audio thread (which spins on it) can proceed safely.
+                        webview.jni_handle().exec(|env, context, _webview| {
+                            let vm = env.get_java_vm().expect("Failed to get JavaVM");
+                            unsafe {
+                                ndk_context::initialize_android_context(
+                                    vm.get_java_vm_pointer() as *mut _,
+                                    context.as_raw() as *mut _,
+                                );
+                            }
+
+                            ANDROID_NDK_READY.get_or_init(|| ());
+                            info!("Android NDK context initialized.");
+                        });
+                    });
+                } else {
+                    // Webview not available yet at setup time; signal anyway so the
+                    // audio thread doesn't block forever (best-effort fallback).
+                    warn!("Main webview not found at setup time; signalling NDK ready without init.");
+                    ANDROID_NDK_READY.get_or_init(|| ());
+                }
+            }
+
             player::init_local_player(app.handle().clone());
 
             #[cfg(target_os = "windows")]
