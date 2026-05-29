@@ -33,9 +33,8 @@ tauri = "2.6.2"
 rodio = { version = "0.22", features = [] }
 parking_lot = "0.12"
 
-ffmpeg_audio = { git = "https://github.com/apoint123/ffmpeg-audio.git", rev = "dfd17b062303403b86a9bb0c509ee03aed3cbade" }
+ffmpeg_audio = { git = "https://github.com/apoint123/ffmpeg-audio.git", rev = "19c42ec2c92264ce8155fa908c73c570897c2260" }
 now-playing-controls = { git = "https://github.com/apoint123/now-playing-controls.git" }
-
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
