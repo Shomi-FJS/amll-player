@@ -46,7 +46,7 @@ tauri-plugin-os = { version = "2" }
 tauri-plugin-shell = { version = "2" }
 
 amll-player-core = { path = "../../player-core" }
-ffmpeg_audio = { git = "https://github.com/apoint123/ffmpeg-audio.git", rev = "19c42ec2c92264ce8155fa908c73c570897c2260" }
+ffmpeg_audio = { git = "https://github.com/apoint123/ffmpeg-audio.git", rev = "8838598a39f201cb2bc1384a41db90470a98b325" }
 ws-protocol = { path = "../../ws-protocol", features = ["tracing"] }
 tauri-plugin-http = "2"
 rodio = "0.22"
