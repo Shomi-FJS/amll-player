@@ -22,7 +22,8 @@ use parking_lot::RwLock as ParkingLotRwLock;
 use rodio::{MixerDeviceSink, Player, Source};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock as TokioRwLock;
-use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 pub struct AudioPlayer {
@@ -38,12 +39,10 @@ pub struct AudioPlayer {
     current_audio_info: Arc<TokioRwLock<AudioInfo>>,
     current_audio_quality: Arc<TokioRwLock<AudioQuality>>,
     playback_state: Arc<ParkingLotRwLock<PlaybackState>>,
+    cancel_token: CancellationToken,
 
-    tasks: Vec<JoinHandle<()>>,
     npc_event_rx: Option<UnboundedReceiver<SystemMediaEvent>>,
     fft_player: Arc<ParkingLotRwLock<FFTPlayer>>,
-
-    fft_broadcast_task: Option<JoinHandle<()>>,
     target_channels: u16,
     target_sample_rate: u32,
 }
@@ -117,84 +116,93 @@ impl AudioPlayer {
         let fft_player = Arc::new(ParkingLotRwLock::new(FFTPlayer::new()));
         let playback_state = Arc::new(ParkingLotRwLock::new(PlaybackState::default()));
 
-        let mut tasks = Vec::new();
-
         let (manager, npc_event_rx) = SystemMediaManager::new();
         let media_manager = Arc::new(manager);
 
         let audio_info_reader = current_audio_info.clone();
         let emitter_pos = AudioPlayerEventEmitter::new(evt_sender.clone());
         let media_manager_for_task = media_manager.clone();
-
         let playback_state_for_task = playback_state.clone();
+        let cancel_token = CancellationToken::new();
 
-        tasks.push(tokio::task::spawn(async move {
+        let timeline_token = cancel_token.clone();
+        tokio::task::spawn(async move {
             let mut time_it = tokio::time::interval(Duration::from_secs(1));
 
             loop {
-                time_it.tick().await;
-
-                let (is_playing, base_time, counter_clone) = {
-                    let state = playback_state_for_task.read();
-                    (
-                        state.is_playing,
-                        state.base_time_sec,
-                        state.samples_counter.clone(),
-                    )
-                };
-
-                if is_playing {
-                    let duration = audio_info_reader.read().await.duration;
-                    if duration > 0.0 {
-                        let played_time = if let Some(counter) = &counter_clone {
-                            let samples = counter.load(Ordering::Relaxed) as f64;
-                            let rate = target_sample_rate as f64;
-                            let ch = target_channels as f64;
-                            samples / (rate * ch)
-                        } else {
-                            0.0
+                tokio::select! {
+                    _ = timeline_token.cancelled() => {
+                        break;
+                    }
+                    _ = time_it.tick() => {
+                        let (is_playing, base_time, counter_clone) = {
+                            let state = playback_state_for_task.read();
+                            (state.is_playing, state.base_time_sec, state.samples_counter.clone())
                         };
 
-                        let local_current_pos = (base_time + played_time).min(duration);
+                        if is_playing {
+                            let duration = audio_info_reader.read().await.duration;
+                            if duration > 0.0 {
+                                let played_time = if let Some(counter) = &counter_clone {
+                                    let samples = counter.load(Ordering::Relaxed) as f64;
+                                    let rate = target_sample_rate as f64;
+                                    let ch = target_channels as f64;
+                                    samples / (rate * ch)
+                                } else {
+                                    0.0
+                                };
 
-                        let _ = emitter_pos
-                            .emit(AudioThreadEvent::PlayPosition {
-                                position: local_current_pos,
-                            })
-                            .await;
+                                let local_current_pos = (base_time + played_time).min(duration);
 
-                        media_manager_for_task.update_timeline(local_current_pos, duration);
+                                let _ = emitter_pos
+                                    .emit(AudioThreadEvent::PlayPosition {
+                                        position: local_current_pos,
+                                    })
+                                    .await;
+
+                                media_manager_for_task.update_timeline(
+                                    local_current_pos,
+                                    duration,
+                                );
+                            }
+                        }
                     }
                 }
             }
-        }));
+        });
 
         let fft_player_clone = fft_player.clone();
         let emitter_clone = AudioPlayerEventEmitter::new(evt_sender.clone());
-        let fft_broadcast_task = Some(tokio::task::spawn(async move {
+        let fft_token = cancel_token.clone();
+        tokio::task::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(50));
             let mut fft_buffer = vec![0.0; 128];
 
             loop {
-                interval.tick().await;
-
-                let data_to_send: Option<Vec<f32>> = {
-                    if let Some(mut player) = fft_player_clone.try_write() {
-                        if player.has_data() && player.read(&mut fft_buffer) {
-                            Some(fft_buffer.clone())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
+                tokio::select! {
+                    _ = fft_token.cancelled() => {
+                        break;
                     }
-                };
+                    _ = interval.tick() => {
+                        let data_to_send: Option<Vec<f32>> = {
+                            if let Some(mut player) = fft_player_clone.try_write() {
+                                if player.has_data() && player.read(&mut fft_buffer) {
+                                    Some(fft_buffer.clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        };
 
-                if let Some(data) = data_to_send {
-                    let _ = emitter_clone.emit(AudioThreadEvent::FFTData { data }).await;
+                        if let Some(data) = data_to_send {
+                            let _ = emitter_clone.emit(AudioThreadEvent::FFTData { data }).await;
+                        }
+                    }
                 }
             }
-        }));
+        });
 
         Self {
             evt_sender,
@@ -208,10 +216,9 @@ impl AudioPlayer {
             current_audio_info,
             current_audio_quality,
             playback_state,
-            tasks,
+            cancel_token,
             npc_event_rx,
             fft_player,
-            fft_broadcast_task,
             target_channels,
             target_sample_rate,
             media_manager,
@@ -481,12 +488,7 @@ impl AudioPlayer {
 
 impl Drop for AudioPlayer {
     fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
-        }
-        if let Some(handle) = self.fft_broadcast_task.take() {
-            handle.abort();
-        }
+        self.cancel_token.cancel();
     }
 }
 

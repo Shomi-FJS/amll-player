@@ -150,6 +150,7 @@ dependencies = [
  "spectrum-analyzer",
  "tauri",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]

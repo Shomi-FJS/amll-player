@@ -35,6 +35,7 @@ parking_lot = "0.12"
 
 ffmpeg_audio = { git = "https://github.com/apoint123/ffmpeg-audio.git", rev = "8838598a39f201cb2bc1384a41db90470a98b325" }
 now-playing-controls = { git = "https://github.com/apoint123/now-playing-controls.git" }
+tokio-util = "0.7.18"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
