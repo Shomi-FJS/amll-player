@@ -429,19 +429,18 @@ fn logical_pixel_unit(value: f64) -> PixelUnit {
 fn resolve_size_constraints(
     options: &ExtensionWindowOptions,
 ) -> Result<WindowSizeConstraints, String> {
-    if let (Some(min_width), Some(max_width)) = (options.min_width, options.max_width) {
-        if validate_positive_number(min_width, "minWidth")?
+    if let (Some(min_width), Some(max_width)) = (options.min_width, options.max_width)
+        && validate_positive_number(min_width, "minWidth")?
             > validate_positive_number(max_width, "maxWidth")?
-        {
-            return Err("minWidth must be less than or equal to maxWidth".to_string());
-        }
+    {
+        return Err("minWidth must be less than or equal to maxWidth".to_string());
     }
-    if let (Some(min_height), Some(max_height)) = (options.min_height, options.max_height) {
-        if validate_positive_number(min_height, "minHeight")?
+
+    if let (Some(min_height), Some(max_height)) = (options.min_height, options.max_height)
+        && validate_positive_number(min_height, "minHeight")?
             > validate_positive_number(max_height, "maxHeight")?
-        {
-            return Err("minHeight must be less than or equal to maxHeight".to_string());
-        }
+    {
+        return Err("minHeight must be less than or equal to maxHeight".to_string());
     }
 
     Ok(WindowSizeConstraints {
@@ -900,10 +899,10 @@ pub fn extension_window_get_current_extension_files(
 }
 
 pub fn cleanup_destroyed_window(app: &AppHandle, label: &str) {
-    if is_extension_window_label(label) {
-        if let Some(state) = app.try_state::<ExtensionWindowState>() {
-            state.remove_label(label);
-        }
+    if is_extension_window_label(label)
+        && let Some(state) = app.try_state::<ExtensionWindowState>()
+    {
+        state.remove_label(label);
     }
 }
 
