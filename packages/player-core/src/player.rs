@@ -1,6 +1,7 @@
 use std::{
     fmt::Debug,
     fs::File,
+    io::{Read, Seek},
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -16,10 +17,10 @@ use crate::{
     ffmpeg_decoder::{FFmpegDecoder, FFmpegDecoderHandle},
     media_controls::SystemMediaManager,
 };
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use now_playing_controls::model::SystemMediaEvent;
 use parking_lot::RwLock as ParkingLotRwLock;
-use rodio::{MixerDeviceSink, Player, Source};
+use rodio::{MixerDeviceSink, Player};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock as TokioRwLock;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -45,6 +46,8 @@ pub struct AudioPlayer {
     fft_player: Arc<ParkingLotRwLock<FFTPlayer>>,
     target_channels: u16,
     target_sample_rate: u32,
+
+    custom_song_loader: Option<Arc<CustomSongLoaderFn>>,
 }
 
 #[derive(Default, Debug)]
@@ -65,9 +68,7 @@ pub struct AudioInfo {
     pub cover_media_type: String,
     #[serde(skip)]
     pub cover: Option<Vec<u8>>,
-    pub comment: String,
     pub duration: f64,
-    pub position: f64,
 }
 
 impl Debug for AudioInfo {
@@ -79,18 +80,16 @@ impl Debug for AudioInfo {
             .field("lyric", &self.lyric)
             .field("cover_media_type", &self.cover_media_type)
             .field("cover", &self.cover.as_ref().map(|x| x.len()))
-            .field("comment", &self.comment)
             .field("duration", &self.duration)
-            .field("position", &self.position)
             .finish()
     }
 }
 
+pub trait CustomMediaSource: Read + Seek + Send + 'static {}
+impl<T: Read + Seek + Send + 'static> CustomMediaSource for T {}
 pub type CustomSongLoaderReturn =
-    Box<dyn futures::Future<Output = anyhow::Result<Box<dyn Source<Item = f32> + Send>>> + Send>;
+    Box<dyn futures::Future<Output = anyhow::Result<Box<dyn CustomMediaSource>>> + Send + Unpin>;
 pub type CustomSongLoaderFn = Box<dyn Fn(String) -> CustomSongLoaderReturn + Send + Sync>;
-pub type LocalSongLoaderReturn = Box<dyn futures::Future<Output = anyhow::Result<File>> + Send>;
-pub type LocalSongLoaderFn = Box<dyn Fn(String) -> LocalSongLoaderReturn + Send + Sync>;
 
 pub struct AudioPlayerConfig {}
 
@@ -222,7 +221,12 @@ impl AudioPlayer {
             target_channels,
             target_sample_rate,
             media_manager,
+            custom_song_loader: None,
         }
+    }
+
+    pub fn set_custom_song_loader(&mut self, loader: CustomSongLoaderFn) {
+        self.custom_song_loader = Some(Arc::new(loader));
     }
 
     pub fn handler(&self) -> AudioPlayerHandle {
@@ -427,20 +431,34 @@ impl AudioPlayer {
         }
 
         let song_data = self.current_song.clone().context("没有当前歌曲可播放")?;
-        let file_path = match &song_data {
-            SongData::Local { file_path, .. } => file_path.clone(),
-            _ => return Err(anyhow!("当前实现仅支持本地文件")),
+
+        let (source_stream, preloaded_info) = match &song_data {
+            SongData::Local { file_path, .. } => {
+                let file =
+                    File::open(file_path).with_context(|| format!("打开 {file_path} 失败"))?;
+                (Box::new(file) as Box<dyn CustomMediaSource>, None)
+            }
+            SongData::Custom {
+                song_json_data,
+                preloaded_info,
+                ..
+            } => {
+                if let Some(loader) = &self.custom_song_loader {
+                    let stream = loader(song_json_data.clone()).await?;
+                    (stream, preloaded_info.clone())
+                } else {
+                    anyhow::bail!("传入了自定义音乐源但未设置自定义音乐加载器");
+                }
+            }
         };
 
         let target_channels = self.target_channels;
         let target_sample_rate = self.target_sample_rate;
-
         let fft_player_clone = self.fft_player.clone();
-        let file_path_clone = file_path.clone();
 
         let source_result = tokio::task::spawn_blocking(move || {
             FFmpegDecoder::new(
-                file_path_clone,
+                source_stream,
                 fft_player_clone,
                 target_channels,
                 target_sample_rate,
@@ -457,8 +475,33 @@ impl AudioPlayer {
             state.base_time_sec = 0.0;
         }
 
-        let info = source.audio_info();
+        let mut info = source.audio_info();
         let quality = source.audio_quality();
+
+        if let Some(preloaded) = preloaded_info {
+            if !preloaded.name.is_empty() {
+                info.name = preloaded.name;
+            }
+            if !preloaded.artist.is_empty() {
+                info.artist = preloaded.artist;
+            }
+            if !preloaded.album.is_empty() {
+                info.album = preloaded.album;
+            }
+            if !preloaded.lyric.is_empty() {
+                info.lyric = preloaded.lyric;
+            }
+            if !preloaded.cover_media_type.is_empty() {
+                info.cover_media_type = preloaded.cover_media_type;
+            }
+            if preloaded.cover.is_some() {
+                info.cover = preloaded.cover;
+            }
+
+            if info.duration <= 0.0 && preloaded.duration > 0.0 {
+                info.duration = preloaded.duration;
+            }
+        }
 
         *self.current_audio_info.write().await = info.clone();
         *self.current_audio_quality.write().await = quality.clone();

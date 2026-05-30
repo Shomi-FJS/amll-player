@@ -18,7 +18,6 @@ pub fn build_audio_info(reader: &AudioReader) -> AudioInfo {
     info.artist = get_meta("artist");
     info.album = get_meta("album");
     info.lyric = get_meta("lyrics");
-    info.comment = get_meta("comment");
 
     if let Some(cover) = reader.cover() {
         info.cover = Some(cover.data);

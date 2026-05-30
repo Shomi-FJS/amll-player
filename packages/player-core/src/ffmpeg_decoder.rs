@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::fs::File;
 use std::sync::atomic::AtomicU64;
 use std::sync::{
     Arc,
@@ -10,7 +9,8 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::{
-    audio_quality::AudioQuality, fft_player::FFTPlayer, player::AudioInfo, utils::build_audio_info,
+    CustomMediaSource, audio_quality::AudioQuality, fft_player::FFTPlayer, player::AudioInfo,
+    utils::build_audio_info,
 };
 use anyhow::Context;
 use ffmpeg_audio::{AudioReader, ResampleOptions, Resampler};
@@ -81,7 +81,7 @@ impl FFmpegDecoderHandle {
 
 impl FFmpegDecoder {
     pub fn new(
-        path: String,
+        source: Box<dyn CustomMediaSource>,
         fft_player: Arc<RwLock<FFTPlayer>>,
         target_channels: u16,
         target_sample_rate: u32,
@@ -100,7 +100,7 @@ impl FFmpegDecoder {
             let shared = shared.clone();
             thread::spawn(move || {
                 decoder_thread_entry(
-                    path,
+                    source,
                     target_channels,
                     target_sample_rate,
                     shared,
@@ -145,14 +145,14 @@ impl FFmpegDecoder {
 }
 
 fn decoder_thread_entry(
-    path: String,
+    source: Box<dyn CustomMediaSource>,
     target_channels: u16,
     target_sample_rate: u32,
     shared: Arc<Shared>,
     control_rx: Receiver<ControlMessage>,
     init_tx: SyncSender<anyhow::Result<DecoderMetadata>>,
 ) {
-    let init_result = setup_decoder_resources(&path, target_channels, target_sample_rate);
+    let init_result = setup_decoder_resources(source, target_channels, target_sample_rate);
 
     let mut init_data = match init_result {
         Ok(data) => {
@@ -176,12 +176,11 @@ fn decoder_thread_entry(
 }
 
 fn setup_decoder_resources(
-    path: &str,
+    source: Box<dyn CustomMediaSource>,
     target_channels: u16,
     target_sample_rate: u32,
 ) -> anyhow::Result<DecoderInitData> {
-    let file = File::open(path).with_context(|| format!("打开 {path} 文件失败"))?;
-    let reader = AudioReader::new(file).with_context(|| format!("初始化音频解码器失败: {path}"))?;
+    let reader = AudioReader::new(source).context("初始化音频解码器失败")?;
 
     let total_duration = reader.duration();
     let source_info = reader.source_info().clone();

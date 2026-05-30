@@ -13,22 +13,19 @@ mod player;
 pub mod utils;
 pub use player::*;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum SongData {
     #[serde(rename_all = "camelCase")]
-    Local {
-        file_path: String,
-        orig_order: usize,
-    },
+    Local { file_path: String },
     /// 自定义的歌曲数据，可以交由宿主程序注册的歌曲元数据处理器处理
     #[serde(rename_all = "camelCase")]
     Custom {
         id: String,
         song_json_data: String,
-        orig_order: usize,
+        preloaded_info: Option<AudioInfo>,
     },
 }
 

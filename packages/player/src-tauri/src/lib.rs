@@ -96,7 +96,6 @@ pub struct MusicInfo {
     pub album: String,
     pub lyric_format: String,
     pub lyric: String,
-    pub comment: String,
     pub cover: Vec<u8>,
     pub duration: f64,
 }
@@ -113,7 +112,6 @@ impl From<AudioInfo> for MusicInfo {
                 "lrc".into()
             },
             lyric: v.lyric,
-            comment: v.comment,
             cover: v.cover.unwrap_or_default(),
             duration: v.duration,
         }
